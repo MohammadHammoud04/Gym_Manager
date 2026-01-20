@@ -1,0 +1,183 @@
+"use client"
+import { useEffect, useState } from "react"
+import axios from "axios"
+import { Coffee, Plus, Receipt, Trash2, Package, Zap } from "lucide-react"
+
+export default function Sales() {
+  const [sales, setSales] = useState([])
+  const [inventory, setInventory] = useState([])
+  const [formData, setFormData] = useState({ itemName: "", quantity: 1, pricePerUnit: "" })
+
+  const fetchSales = async () => {
+    const res = await axios.get("http://localhost:5000/sales")
+    setSales(res.data)
+  }
+
+  const fetchInventory = async () => {
+    const res = await axios.get("http://localhost:5000/inventory")
+    setInventory(res.data)
+  }
+
+  // --- DELETE FUNCTION (Returns stock to inventory) ---
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure? This will remove the sale and return items to stock.")) {
+      try {
+        await axios.delete(`http://localhost:5000/sales/${id}`);
+        // Refresh both lists immediately
+        await fetchSales();
+        await fetchInventory();
+      } catch (err) {
+        console.error("Delete failed:", err);
+        alert("Failed to delete sale.");
+      }
+    }
+  };
+
+  const handleQuickSell = async (item) => {
+    if (item.currentStock <= 0) return alert("Out of stock!");
+    try {
+      const saleData = {
+        itemName: item.name,
+        quantity: 1,
+        pricePerUnit: item.salePrice,
+        totalPrice: item.salePrice
+      };
+      await axios.post("http://localhost:5000/sales/add", saleData);
+      await fetchInventory();
+      await fetchSales();
+    } catch (err) {
+      console.error("Quick sell failed", err);
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const totalPrice = formData.quantity * formData.pricePerUnit
+    await axios.post("http://localhost:5000/sales/add", { ...formData, totalPrice })
+    setFormData({ itemName: "", quantity: 1, pricePerUnit: "" })
+    fetchSales()
+    fetchInventory()
+  }
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        await Promise.all([fetchSales(), fetchInventory()]);
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    fetchData()
+  }, [])
+
+  return (
+    <div className="min-h-screen bg-gym-black p-6 lg:p-8">
+      <div className="flex items-center gap-3 mb-8">
+        <Coffee className="w-8 h-8 text-gym-yellow" />
+        <h1 className="text-4xl font-bold text-white">Shop & Inventory</h1>
+      </div>
+
+      {/* Quick Sell Inventory Section */}
+      <div className="mb-10">
+        <div className="flex items-center gap-2 mb-4 text-white">
+          <Zap className="w-5 h-5 text-gym-yellow" />
+          <h2 className="text-xl font-bold">Quick Sell (In Stock)</h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {inventory.map((item) => (
+            <div key={item._id} className="bg-gym-gray-dark border-2 border-gym-gray-border p-4 rounded-2xl flex flex-col justify-between hover:border-gym-yellow transition-all shadow-lg">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h3 className="text-white font-bold capitalize">{item.name}</h3>
+                  <p className={`text-xs ${item.currentStock > 0 ? 'text-gym-yellow' : 'text-red-500'}`}>
+                    Stock: {item.currentStock}
+                  </p>
+                </div>
+                <Package className="w-4 h-4 text-gym-gray-text" />
+              </div>
+              <button
+                disabled={item.currentStock <= 0}
+                onClick={() => handleQuickSell(item)}
+                className={`w-full py-2 rounded-xl font-bold transition-all ${
+                  item.currentStock > 0 
+                  ? "bg-gym-yellow text-gym-black hover:bg-gym-yellow-bright" 
+                  : "bg-gym-gray text-gym-gray-text cursor-not-allowed"
+                }`}
+              >
+                {item.currentStock > 0 ? `Sell $${item.salePrice}` : "Out of Stock"}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <hr className="border-gym-gray-border mb-10" />
+
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* Manual Sale Form */}
+        <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl h-fit">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <Plus className="text-gym-yellow" /> Manual Entry
+          </h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <input
+              placeholder="Item Name"
+              className="w-full px-4 py-3 rounded-xl bg-gym-gray border-2 border-gym-gray-border text-white focus:border-gym-yellow outline-none"
+              value={formData.itemName}
+              onChange={(e) => setFormData({...formData, itemName: e.target.value})}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <input
+                type="number"
+                placeholder="Qty"
+                className="w-full px-4 py-3 rounded-xl bg-gym-gray border-2 border-gym-gray-border text-white outline-none"
+                value={formData.quantity}
+                onChange={(e) => setFormData({...formData, quantity: Number(e.target.value)})}
+              />
+              <input
+                type="number"
+                placeholder="Price each"
+                className="w-full px-4 py-3 rounded-xl bg-gym-gray border-2 border-gym-gray-border text-white outline-none"
+                value={formData.pricePerUnit}
+                onChange={(e) => setFormData({...formData, pricePerUnit: Number(e.target.value)})}
+              />
+            </div>
+            <button className="w-full bg-gym-yellow text-gym-black font-bold py-3 rounded-xl hover:bg-gym-yellow-bright transition-all">
+              Log Sale (+${formData.quantity * formData.pricePerUnit || 0})
+            </button>
+          </form>
+        </div>
+
+        {/* History Section */}
+        <div className="lg:col-span-2 bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <Receipt className="text-gym-yellow" /> Recent Sales
+          </h2>
+          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+            {sales.map(sale => (
+              <div key={sale._id} className="flex justify-between items-center p-4 bg-gym-gray rounded-xl border-2 border-gym-gray-border hover:border-gym-yellow/50 transition-all">
+                <div>
+                  <p className="text-white font-bold">{sale.itemName} <span className="text-gym-yellow ml-2 text-sm">x{sale.quantity}</span></p>
+                  <p className="text-gym-gray-text text-xs">{new Date(sale.date).toLocaleDateString()}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="text-green-500 font-bold text-lg">+${sale.totalPrice}</p>
+                    <p className="text-gym-gray-text text-[10px]">REVENUE</p>
+                  </div>
+                  {/* --- CONNECTED DELETE BUTTON --- */}
+                  <button 
+                    onClick={() => handleDelete(sale._id)} 
+                    className="p-2 text-gym-gray-text hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                  >
+                    <Trash2 size={18}/>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

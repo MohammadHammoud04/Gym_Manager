@@ -1,0 +1,48 @@
+{
+  "name": "gym_manager",
+  "version": "1.0.0",
+  "main": "client/electron/main.cjs",
+  "description": "Gym Management System",
+  "author": "Mohammad",
+  "scripts": {
+    "dev": "concurrently \"cd server && npx nodemon index.js\" \"cd client && npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "cd client && npm run build && cd ../server && npm install --production && cd .. && electron-builder"
+  },
+  "build": {
+    "appId": "com.gym.manager",
+    "productName": "B7Gym",
+    "win": {
+      "target": "nsis",
+      "icon": "client/electron/favicon.ico",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "installerIcon": "client/electron/favicon.ico"
+    },
+    "files": [
+      "client/dist/**/*",
+      "client/electron/**/*"
+    ],
+    "extraResources": [
+      ".env",
+      {
+        "from": "server",
+        "to": "server",
+        "filter": [
+          "**/*",
+          "node_modules/**/*"
+        ]
+      },
+      ".env"
+    ],
+    "directories": {
+      "output": "dist_electron"
+    }
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.4.0",
+    "wait-on": "^9.0.3"
+  }
+}

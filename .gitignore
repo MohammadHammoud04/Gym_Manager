@@ -1,4 +1,18 @@
 # Logs
+=======
+node_modules/
+
+dist/
+dist-ssr/
+dist_electron/
+*.exe
+build/
+
+.env
+*.local
+.env.example
+
+>>>>>>> 3feeadc (Initial Commit: Gym Manager)
 logs
 *.log
 npm-debug.log*
@@ -137,3 +151,16 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+=======
+pnpm-debug.log*
+
+.vscode/
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+>>>>>>> 3feeadc (Initial Commit: Gym Manager)
