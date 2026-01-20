@@ -10,7 +10,7 @@ build/
 
 .env
 *.local
-.env.example
+!.env.example
 
 >>>>>>> 3feeadc (Initial Commit: Gym Manager)
 logs

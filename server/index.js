@@ -3,19 +3,23 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
 const bcrypt = require("bcryptjs");
+const fs = require('fs');
 
 const isInsideAsar = __dirname.includes('app.asar');
 
-const envPath = isInsideAsar 
-  ? path.join(process.resourcesPath, '.env') 
-  : path.join(__dirname, '..', '.env'); 
+const isProduction = __dirname.includes('resources');
+
+const envPath = isProduction 
+  ? path.join(__dirname, '.env')         // Production: look in resources/server/.env
+  : path.join(__dirname, '..', '.env');  // Development: look in root/.env
 
 require('dotenv').config({ path: envPath });
 
+console.log(`[Server] Is Production: ${isProduction}`);
 console.log(`[Server] Environment loaded from: ${envPath}`);
-// --------------------------
 
-// Import Routes using require
+console.log(`[Server] Environment loaded from: ${envPath}`);
+
 const loginRoutes = require("./routes/login.js");
 const memberRoutes = require("./routes/memberRoutes.js");
 const membershipTypeRoutes = require("./routes/membershipTypeRoutes.js");
@@ -26,7 +30,6 @@ const saleRoutes = require("./routes/saleRoutes.js");
 const inventoryRoutes = require("./routes/inventoryRoutes.js");
 const syncRoutes = require("./routes/sync.js");
 
-// Import Model using require
 const User = require("./models/User.js");
 
 const app = express();
@@ -51,8 +54,7 @@ app.use("/profit", profitRoutes);
 app.use("/payments", paymentRoutes);
 app.use("/sync", syncRoutes);
 
-// Database Connection Logic
-// Use the env variables loaded from the correctly mapped path
+
 const localURI = process.env.LOCAL_MONGO_URI || "mongodb://127.0.0.1:27017/gym-manager";
 const cloudURI = process.env.CLOUD_MONGO_URI || process.env.MONGO_URI;
 

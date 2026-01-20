@@ -6,8 +6,7 @@
   "author": "Mohammad",
   "scripts": {
     "dev": "concurrently \"cd server && npx nodemon index.js\" \"cd client && npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
-    "build": "cd client && npm run build && cd ../server && npm install --production && cd .. && electron-builder"
-  },
+    "build": "cd client && npm run build && cd ../server && npm install --production && mv node_modules modules_prod && cd .. && electron-builder"  },
   "build": {
     "appId": "com.gym.manager",
     "productName": "B7Gym",
@@ -21,7 +20,9 @@
     },
     "files": [
       "client/dist/**/*",
-      "client/electron/**/*"
+      "client/electron/**/*",
+      "package.json",
+      "server/**/*"
     ],
     "extraResources": [
       ".env",
@@ -30,11 +31,18 @@
         "to": "server",
         "filter": [
           "**/*",
-          "node_modules/**/*"
+          "!node_modules" 
         ]
       },
-      ".env"
+      {
+        "from": "server/node_modules",
+        "to": "server/node_modules",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
+    "asar": true,
     "directories": {
       "output": "dist_electron"
     }

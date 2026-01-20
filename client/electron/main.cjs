@@ -6,17 +6,19 @@ let serverProcess;
 
 function createWindow() {
   const isPackaged = app.isPackaged;
+  const isDev = !app.isPackaged;
 
-  // 1. Correct Server Path
-  // When packaged, electron-builder puts 'extraResources' in the 'resources' folder
-  const serverPath = isPackaged 
-    ? path.join(process.resourcesPath, "server", "index.js") 
-    : path.join(__dirname, "../../server/index.js");
+  const serverPath = app.isPackaged
+  ? path.join(process.resourcesPath, "server", "index.js")
+  : path.join(__dirname, "../../server/index.js");
 
-  // Start the backend server
-  serverProcess = fork(serverPath, [], {
-    env: { FORKED: "true" } // Useful if you want your server to know it's being run by Electron
-  });
+    serverProcess = fork(serverPath, [], {
+      env: { 
+        ...process.env,
+        FORKED: "true",
+        PORT: 5000 
+      }
+    });
 
   const win = new BrowserWindow({
     width: 1200,
@@ -31,16 +33,24 @@ function createWindow() {
     },
   });
 
-  // 2. Correct Frontend Path
-  if (isPackaged) {
-    // path.join(__dirname, "../dist/index.html") works IF 'dist' and 'electron' 
-    // are siblings inside the 'client' folder.
-    const indexPath = path.join(__dirname, "..", "dist", "index.html");
+  //frontend path
+if (isPackaged) {
+  const indexPath = path.join(__dirname, "..", "dist", "index.html");
+  
+ setTimeout(() => {
     win.loadFile(indexPath).catch((e) => console.error("Failed to load index.html:", e));
-  } else {
-    win.loadURL("http://localhost:5173");
-  }
+  }, 1000);
 
+} else {
+  win.loadURL("http://localhost:5173");
+}
+
+if (isDev) {
+    win.loadURL('http://localhost:5173');
+  } else {
+    // THIS IS THE KEY: Load the index.html from the dist folder
+    win.loadFile(path.join(__dirname, '../dist/index.html'));
+  }
   win.on("closed", () => {
     if (serverProcess) serverProcess.kill();
   });

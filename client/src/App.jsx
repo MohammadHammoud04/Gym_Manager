@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, Link, useLocation, HashRouter} from "react-router-dom";
 import { 
   Dumbbell, LayoutDashboard, Users, CreditCard, 
   ShoppingBag, Receipt, TrendingUp, LogOut,
