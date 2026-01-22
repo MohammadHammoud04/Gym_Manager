@@ -1,7 +1,8 @@
+const path = require("path"); 
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const path = require("path");
 const bcrypt = require("bcryptjs");
 const fs = require('fs');
 
@@ -13,7 +14,9 @@ const envPath = isProduction
   ? path.join(__dirname, '.env')         // Production: look in resources/server/.env
   : path.join(__dirname, '..', '.env');  // Development: look in root/.env
 
-require('dotenv').config({ path: envPath });
+
+console.log("CLOUD_MONGO_URI:", process.env.CLOUD_MONGO_URI);
+console.log("LOCAL_MONGO_URI:", process.env.LOCAL_MONGO_URI);
 
 console.log(`[Server] Is Production: ${isProduction}`);
 console.log(`[Server] Environment loaded from: ${envPath}`);

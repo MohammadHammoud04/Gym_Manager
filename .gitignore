@@ -1,5 +1,4 @@
 # Logs
-=======
 node_modules/
 
 dist/
@@ -11,6 +10,8 @@ build/
 .env
 *.local
 !.env.example
+server/migrateExpenses.js
+server/scripts/
 
 >>>>>>> 3feeadc (Initial Commit: Gym Manager)
 logs

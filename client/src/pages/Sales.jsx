@@ -7,6 +7,8 @@ export default function Sales() {
   const [sales, setSales] = useState([])
   const [inventory, setInventory] = useState([])
   const [formData, setFormData] = useState({ itemName: "", quantity: 1, pricePerUnit: "" })
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
+
 
   const fetchSales = async () => {
     const res = await axios.get("http://localhost:5000/sales")
@@ -18,21 +20,18 @@ export default function Sales() {
     setInventory(res.data)
   }
 
-  // --- DELETE FUNCTION (Returns stock to inventory) ---
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure? This will remove the sale and return items to stock.")) {
-      try {
-        await axios.delete(`http://localhost:5000/sales/${id}`);
-        // Refresh both lists immediately
-        await fetchSales();
-        await fetchInventory();
-      } catch (err) {
-        console.error("Delete failed:", err);
-        alert("Failed to delete sale.");
-      }
+    try {
+      await axios.delete(`http://localhost:5000/sales/${id}`);
+      await fetchSales();
+      await fetchInventory();
+      setDeleteConfirm(null); // close modal
+    } catch (err) {
+      console.error("Delete failed:", err);
+      alert("Failed to delete sale.");
     }
   };
-
+  
   const handleQuickSell = async (item) => {
     if (item.currentStock <= 0) return alert("Out of stock!");
     try {
@@ -72,6 +71,36 @@ export default function Sales() {
 
   return (
     <div className="min-h-screen bg-gym-black p-6 lg:p-8">
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 border-2 border-red-500 flex items-center justify-center">
+                <Trash2 className="w-6 h-6 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-white">Delete Expense</h3>
+            </div>
+            <p className="text-gym-gray-text mb-6">
+              Are you sure you want to delete <span className="text-white font-semibold">{deleteConfirm.itemName}</span> recorded on {new Date(deleteConfirm.date).toLocaleDateString()}? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 px-4 py-3 rounded-xl border-2 border-gym-gray-border text-white font-semibold hover:bg-gym-gray transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(deleteConfirm._id)}
+                className="flex-1 px-4 py-3 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition-all"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 mb-8">
         <Coffee className="w-8 h-8 text-gym-yellow" />
         <h1 className="text-4xl font-bold text-white">Shop & Inventory</h1>
@@ -158,8 +187,16 @@ export default function Sales() {
               <div key={sale._id} className="flex justify-between items-center p-4 bg-gym-gray rounded-xl border-2 border-gym-gray-border hover:border-gym-yellow/50 transition-all">
                 <div>
                   <p className="text-white font-bold">{sale.itemName} <span className="text-gym-yellow ml-2 text-sm">x{sale.quantity}</span></p>
-                  <p className="text-gym-gray-text text-xs">{new Date(sale.date).toLocaleDateString()}</p>
-                </div>
+                  <p className="text-gym-gray-text text-xs">
+                    {new Date(sale.date).toLocaleString([], { 
+                      year: 'numeric', 
+                      month: 'numeric', 
+                      day: 'numeric', 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </p>                
+                  </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
                     <p className="text-green-500 font-bold text-lg">+${sale.totalPrice}</p>
@@ -167,7 +204,7 @@ export default function Sales() {
                   </div>
                   {/* --- CONNECTED DELETE BUTTON --- */}
                   <button 
-                    onClick={() => handleDelete(sale._id)} 
+                    onClick={() => setDeleteConfirm(sale)} 
                     className="p-2 text-gym-gray-text hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
                   >
                     <Trash2 size={18}/>

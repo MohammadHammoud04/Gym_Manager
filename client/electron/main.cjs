@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const { fork } = require("child_process");
 
@@ -18,6 +18,11 @@ function createWindow() {
         FORKED: "true",
         PORT: 5000 
       }
+    });
+
+    ipcMain.handle("show-message-box", async (event, options) => {
+      const result = await dialog.showMessageBox(options);
+      return result;
     });
 
   const win = new BrowserWindow({

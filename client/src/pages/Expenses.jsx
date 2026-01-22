@@ -6,7 +6,10 @@ import { ShoppingCart, Plus, Package, DollarSign, Trash2 } from "lucide-react"
 
 export default function Expenses() {
   const [expenses, setExpenses] = useState([])
-  const [formData, setFormData] = useState({ name: "", amount: "", price: "" })
+  const [formData, setFormData] = useState({ name: "", amount: "", price: "", addToInventory: false, salePrice: "" })
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [inventory, setInventory] = useState([])
+
 
   const fetchExpenses = async () => {
     try {
@@ -18,31 +21,72 @@ export default function Expenses() {
   }
 
   useEffect(() => {
-    const fetchData = async () =>{
-
-    try{
-    await fetchExpenses()
-    }
-    catch(err){
-        console.log(err);
-    }
-    }
-    fetchData()
+    fetchExpenses()
   }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
       await axios.post("http://localhost:5000/expenses/add", formData)
-      setFormData({ name: "", amount: "", price: "" }) // Reset form
-      fetchExpenses() // Refresh list
+      setFormData({ name: "", amount: "", price: "", addToInventory: false, salePrice: "" })
+      fetchExpenses()
     } catch (err) {
       alert("Error adding expense: " + err.message)
     }
   }
 
+  const fetchInventory = async () => {
+    const res = await axios.get("http://localhost:5000/inventory")
+    setInventory(res.data)
+  }
+
+  const handleDelete = async (id) => {
+      try {
+        await axios.delete(`http://localhost:5000/expenses/remove/${id}`);
+        // Refresh both lists immediately
+        await fetchExpenses();
+        await fetchInventory();
+        setDeleteConfirm(null);
+      } catch (err) {
+        console.error("Delete failed:", err);
+        alert("Failed to delete expense.");
+      }
+    }
+;
+
   return (
     <div className="min-h-screen bg-gym-black p-6 lg:p-8">
+      {/* Delete Confirmation Modal (Exactly like Members page) */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 border-2 border-red-500 flex items-center justify-center">
+                <Trash2 className="w-6 h-6 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-white">Delete Expense</h3>
+            </div>
+            <p className="text-gym-gray-text mb-6">
+              Are you sure you want to delete <span className="text-white font-semibold">{deleteConfirm.name}</span> recorded on {new Date(deleteConfirm.date).toLocaleDateString()}? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 px-4 py-3 rounded-xl border-2 border-gym-gray-border text-white font-semibold hover:bg-gym-gray transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(deleteConfirm._id)}
+                className="flex-1 px-4 py-3 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition-all"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
@@ -144,19 +188,33 @@ export default function Expenses() {
             <div className="space-y-4">
               {expenses.length > 0 ? (
                 expenses.map((exp) => (
-                  <div key={exp._id} className="flex items-center justify-between p-4 rounded-xl bg-gym-gray border-2 border-gym-gray-border hover:border-gym-yellow transition-all">
+                  <div key={exp._id} className="flex items-center justify-between p-4 rounded-xl bg-gym-gray border-2 border-gym-gray-border hover:border-gym-yellow transition-all group">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-gym-yellow/10 border-2 border-gym-yellow flex items-center justify-center text-gym-yellow font-bold">
                         {exp.amount}x
                       </div>
                       <div>
                         <p className="text-white font-semibold">{exp.name}</p>
-                        <p className="text-gym-gray-text text-xs">{new Date(exp.date).toLocaleDateString()}</p>
+                        <p className="text-gym-gray-text text-xs">
+                          {new Date(exp.date).toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-red-500 font-bold text-lg">-${exp.price}</p>
-                      <p className="text-gym-gray-text text-xs">Expense</p>
+                    
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <p className="text-red-500 font-bold text-lg">-${exp.price}</p>
+                        <p className="text-gym-gray-text text-xs">Expense</p>
+                      </div>
+                      
+                      {/* Trash Icon Button */}
+                      <button
+                        onClick={() => setDeleteConfirm(exp)}
+                        className="w-10 h-10 rounded-full bg-red-500/10 border-2 border-red-500/50 flex items-center justify-center hover:bg-red-500/20 hover:border-red-500 transition-all "
+                        title="Delete expense"
+                      >
+                        <Trash2 className="w-5 h-5 text-red-500" />
+                      </button>
                     </div>
                   </div>
                 ))

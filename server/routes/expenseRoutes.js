@@ -15,27 +15,64 @@ router.get("/", async (req, res) => {
 
 router.post("/add", async (req, res) => {
     const { name, amount, price, addToInventory, salePrice } = req.body;
+  
     try {
-        // 1. Save the Expense as usual for profit tracking
-        const newExpense = new Expense({ name, amount, price });
-        await newExpense.save();
-
-        // 2. If toggled, update or create Inventory item
-        if (addToInventory) {
-            const costPerUnit = price / amount;
-            await Inventory.findOneAndUpdate(
-                { name: name.toLowerCase() },
-                { 
-                    $inc: { currentStock: amount },
-                    $set: { costPrice: costPerUnit, salePrice: salePrice || (costPerUnit * 1.5) } 
-                },
-                { upsert: true, new: true }
-            );
-        }
-        res.status(201).json(newExpense);
+      let inventoryItem = null;
+  
+      if (addToInventory) {
+        const costPerUnit = price / amount;
+  
+        inventoryItem = await Inventory.findOneAndUpdate(
+          { name: name.toLowerCase().trim() },
+          {
+            $inc: { currentStock: amount },
+            $set: {
+              costPrice: costPerUnit,
+              salePrice: salePrice || costPerUnit * 1.5
+            }
+          },
+          { upsert: true, new: true }
+        );
+      }
+  
+      const newExpense = new Expense({
+        name,
+        amount,
+        price,
+        addedToInventory: addToInventory,
+        inventoryItem: inventoryItem?._id || null
+      });
+  
+      await newExpense.save();
+  
+      res.status(201).json(newExpense);
     } catch (err) {
-        res.status(400).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
-});
+  });
+  
+
+  router.delete("/remove/:id", async (req, res) => {
+    try {
+      const expense = await Expense.findById(req.params.id);
+      if (!expense)
+        return res.status(404).json({ message: "Expense not found" });
+  
+      if (expense.addedToInventory && expense.inventoryItem) {
+        await Inventory.findByIdAndUpdate(
+          expense.inventoryItem,
+          { $inc: { currentStock: -expense.amount } }
+        );
+      }
+  
+      await Expense.findByIdAndDelete(req.params.id);
+  
+      res.json({ message: "Expense and inventory updated" });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  
+  
 
 module.exports = router;

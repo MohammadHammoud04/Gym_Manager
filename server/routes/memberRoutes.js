@@ -6,143 +6,159 @@ const Payment = require("../models/Payment");
 
 // create or extend member
 router.post("/", async (req, res) => {
-    const { name, phone, memberships } = req.body;
+  try {
+    let { name, phone, memberships } = req.body;
 
-    try {
-      // check if a member exists with the SAME name AND SAME phone
-      let member = await Member.findOne({ name, phone });
-  
-      if (!member) {
-        // no exact match means we should create new member
-        member = await Member.create({ name, phone, memberships: [] });
+    name = name.trim();
+    phone = phone.trim();
+    const nameNormalized = name.toLowerCase();
+
+    let member = await Member.findOne({
+      nameNormalized,
+      phone
+    });
+
+    if (!member) {
+      member = new Member({
+        name,
+        phone,
+        memberships: []
+      });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const m of memberships) {
+      const membershipType = await MembershipType.findById(m.membershipTypeId);
+      if (!membershipType) continue;
+
+      let existingMembership = null;
+
+      for (const mem of member.memberships) {
+        const memType = await MembershipType.findById(mem.membershipType);
+        if (memType && memType.category === membershipType.category) {
+          existingMembership = mem;
+          break;
+        }
       }
-  
-      const payments = [];
-  
-      for (let m of memberships) {
+
+      let startDate, endDate;
+
+      if (existingMembership) {
+        const currentEnd = new Date(existingMembership.endDate);
+        startDate = currentEnd > today ? currentEnd : today;
+        endDate = new Date(startDate);
+        endDate.setDate(
+          endDate.getDate() + membershipType.durationInDays
+        );
+        existingMembership.endDate = endDate;
+        existingMembership.membershipType = membershipType._id;
+      } else {
+        startDate = new Date(today);
+        endDate = new Date(startDate);
+        endDate.setDate(
+          endDate.getDate() + membershipType.durationInDays
+        );
+        member.memberships.push({
+          membershipType: membershipType._id,
+          startDate,
+          endDate
+        });
+      }
+    }
+
+    await member.save();
+
+    const payments = await Promise.all(
+      memberships.map(async (m) => {
         const membershipType = await MembershipType.findById(m.membershipTypeId);
-        if (!membershipType) return res.status(404).json({ error: "Membership not found" });
-  
-        // find existing membership in the same category
-        let existing = null;
-        for (let mem of member.memberships) {
-          const memType = await MembershipType.findById(mem.membershipType);
-          if (memType.category === membershipType.category) {
-            existing = mem;
-            break;
-          }
-        }
-  
-        let startDate, endDate;
-  
-        if (existing) {
-          // extend existing membership
-          startDate = new Date(existing.endDate);
-          endDate = new Date(startDate);
-          endDate.setDate(endDate.getDate() + membershipType.durationInDays);
-  
-          existing.endDate = endDate;
-  
-        } else {
-          // new membership in this category
-          startDate = new Date();
-          endDate = new Date();
-          endDate.setDate(endDate.getDate() + membershipType.durationInDays);
-  
-          member.memberships.push({
-            membershipType: membershipType._id,
-            startDate,
-            endDate
-          });
-        }
-  
-        // create payment for this membership addition or extension
-        const payment = await Payment.create({
+        if (!membershipType) return null;
+        return Payment.create({
           member: member._id,
           membershipType: membershipType._id,
           amount: membershipType.price,
           date: new Date()
         });
-  
-        payments.push(payment);
-      }
-  
-      await member.save();
-  
-      res.status(201).json({ member, payments });
-  
-    } catch (err) {
-      // handle duplicate index errors if name and phone unique index is in place
-      if (err.code === 11000) {
-        return res.status(400).json({ error: "A member with this name and phone already exists" });
-      }
-      res.status(500).json({ error: err.message });
-    }
-  });
-  
-  
+      })
+    );
 
-//renew membership
+    res.status(201).json({
+      member,
+      payments: payments.filter(Boolean)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// renew membership
 router.post("/:id/renew", async (req, res) => {
-    const { membershipTypeId } = req.body;
-  
-    try {
-      const member = await Member.findById(req.params.id);
-      if (!member) return res.status(404).json({ error: "Member not found" });
-  
-      const newMembership = await MembershipType.findById(membershipTypeId);
-      if (!newMembership) return res.status(404).json({ error: "Membership not found" });
-  
-      //find membership with the same category
-      let existing = null;
-      for (let m of member.memberships) {
-        const memType = await MembershipType.findById(m.membershipType);
-        if (memType.category === newMembership.category) {
-          existing = m;
-          break;
-        }
+  const { membershipTypeId } = req.body;
+
+  try {
+    const member = await Member.findById(req.params.id);
+    if (!member) return res.status(404).json({ error: "Member not found" });
+
+    const newMembershipType = await MembershipType.findById(membershipTypeId);
+    if (!newMembershipType) return res.status(404).json({ error: "Membership type not found" });
+
+    // Find membership with the same category
+    let existing = null;
+    for (let m of member.memberships) {
+      const memType = await MembershipType.findById(m.membershipType);
+      if (memType && memType.category === newMembershipType.category) {
+        existing = m;
+        break;
       }
-  
-      let startDate, endDate;
-  
-      if (existing) {
-        // Extend existing membership by new duration
-        startDate = new Date(existing.endDate); // start immediately after current end
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + newMembership.durationInDays);
-  
-        existing.endDate = endDate;
-  
-      } else {
-        // No membership in this category means we should create new entry
-        startDate = new Date();
-        endDate = new Date();
-        endDate.setDate(endDate.getDate() + newMembership.durationInDays);
-  
-        member.memberships.push({
-          membershipType: newMembership._id,
-          startDate,
-          endDate
-        });
-      }
-  
-      await member.save();
-  
-      //create payment for renewal
-      const payment = await Payment.create({
-        member: member._id,
-        membershipType: newMembership._id,
-        amount: newMembership.price,
-        date: new Date()
-      });
-  
-      res.json({ member, payment });
-  
-    } catch (err) {
-      res.status(500).json({ error: err.message });
     }
-  });
-  
+
+    let startDate, endDate;
+    const today = new Date();
+
+    if (existing) {
+      const currentEndDate = new Date(existing.endDate);
+
+      // If the membership is still active, start from the end date.
+      startDate = currentEndDate > today ? currentEndDate : today;
+      
+      endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + newMembershipType.durationInDays);
+
+      existing.endDate = endDate;
+      // Also update the membershipType ID in case they upgraded (e.g., from Bronze to Gold)
+      existing.membershipType = newMembershipType._id;
+
+    } else {
+      // No membership in this category exists yet
+      startDate = new Date();
+      endDate = new Date();
+      endDate.setDate(endDate.getDate() + newMembershipType.durationInDays);
+
+      member.memberships.push({
+        membershipType: newMembershipType._id,
+        startDate,
+        endDate
+      });
+    }
+
+    await member.save();
+
+    // Create payment for renewal
+    const payment = await Payment.create({
+      member: member._id,
+      membershipType: newMembershipType._id,
+      amount: newMembershipType.price,
+      date: new Date()
+    });
+
+    res.json({ member, payment });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});  
 
 //get all payments for a member
 router.get("/:id/payments", async(req,res)=>{
@@ -158,7 +174,6 @@ router.get("/:id/payments", async(req,res)=>{
     }
 });
 
-// GET all members
 // GET all members
 router.get("/", async (req, res) => {
   try {
