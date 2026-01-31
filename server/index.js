@@ -27,7 +27,6 @@ const connectDB = async () => {
     createDefaultUsers();
   } catch (err) {
     console.error("❌ LOCAL DB ERROR: Is the MongoDB Service running?", err.message);
-    // Keep server alive so you can show an error in the UI
   }
 };
 

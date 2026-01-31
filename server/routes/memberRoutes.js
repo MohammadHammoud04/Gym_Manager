@@ -83,12 +83,19 @@ router.post("/", async (req, res) => {
     for (const m of memberships) {
       const membershipType = await MembershipType.findById(m.membershipTypeId);
       if (membershipType) {
+        
+        const discount = Math.max(0, Number(m.discount || 0))
+        const originalAmount = membershipType.price
+        const finalAmount = Math.max(0, originalAmount - discount)
+
         const payment = await Payment.create({
           member: member._id,
           membershipType: membershipType._id,
-          amount: membershipType.price,
+          originalAmount,
+          discount,
+          amount: finalAmount,
           date: new Date()
-        });
+        })
         payments.push(payment);
       }
     }

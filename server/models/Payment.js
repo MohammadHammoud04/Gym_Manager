@@ -11,6 +11,14 @@ const paymentSchema = new mongoose.Schema({
     ref: "MembershipType",
     required: true
   },
+  originalAmount: {
+    type: Number,
+    required: true
+  },
+  discount: {
+    type: Number,
+    default: 0
+  },
   amount: {
     type: Number,
     required: true

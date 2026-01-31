@@ -46,24 +46,18 @@ export default function Members() {
     fetchData()
   }, [])
 
-  const handleAddMember = async () => {
-    const res = await axios.post("http://localhost:5000/members", {
-      ...newMember,
-      memberships: newMember.memberships.map((id) => ({
-        membershipTypeId: id,
-      })),
-    })
-
-    // 2. Trigger the success popup with data from the response
+    const handleAddMember = async () => {
+    const res = await axios.post("http://localhost:5000/members", newMember)
+  
     setShowSuccess({
       name: res.data.member.name,
       count: res.data.payments.length
     })
-
+  
     setNewMember({ name: "", phone: "", memberships: [] })
     fetchMembers()
   }
-
+  
   const handleDeleteMember = async (memberId) => {
     try {
       await axios.delete(`http://localhost:5000/members/${memberId}`)
@@ -267,23 +261,68 @@ export default function Members() {
             <label className="block text-gym-gray-text text-sm mb-2">
               Select Memberships (hold Ctrl/Cmd for multiple)
             </label>
-            <select
-              multiple
-              className="w-full h-32 px-4 py-2 rounded-xl bg-gym-gray border-2 border-gym-gray-border text-white focus:outline-none focus:border-gym-yellow transition-colors"
-              value={newMember.memberships}
-              onChange={(e) =>
-                setNewMember({
-                  ...newMember,
-                  memberships: Array.from(e.target.selectedOptions, (opt) => opt.value),
-                })
-              }
-            >
-              {membershipTypes.map((m) => (
-                <option key={m._id} value={m._id} className="py-2">
-                  {m.name}
-                </option>
-              ))}
-            </select>
+            <div className="md:col-span-2 space-y-3">
+              {membershipTypes.map((m) => {
+                const selected = newMember.memberships.find(
+                  (x) => x.membershipTypeId === m._id
+                )
+
+                return (
+                  <div
+                    key={m._id}
+                    className="flex items-center justify-between gap-3 bg-gym-gray border-2 border-gym-gray-border rounded-xl p-3"
+                  >
+                    <label className="flex items-center gap-3 text-white font-semibold">
+                      <input
+                        type="checkbox"
+                        checked={!!selected}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewMember({
+                              ...newMember,
+                              memberships: [
+                                ...newMember.memberships,
+                                { membershipTypeId: m._id, discount: 0 }
+                              ]
+                            })
+                          } else {
+                            setNewMember({
+                              ...newMember,
+                              memberships: newMember.memberships.filter(
+                                (x) => x.membershipTypeId !== m._id
+                              )
+                            })
+                          }
+                        }}
+                      />
+                      {m.name} — ${m.price}
+                    </label>
+
+                    {selected && (
+                      <input
+                        type="number"
+                        min="0"
+                        max={m.price}
+                        className="w-24 px-2 py-1 rounded-lg bg-gym-black border border-gym-gray-border text-white"
+                        placeholder="Discount"
+                        value={selected.discount}
+                        onChange={(e) => {
+                          setNewMember({
+                            ...newMember,
+                            memberships: newMember.memberships.map((x) =>
+                              x.membershipTypeId === m._id
+                                ? { ...x, discount: Number(e.target.value) }
+                                : x
+                            )
+                          })
+                        }}
+                      />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
           </div>
         </div>
 
