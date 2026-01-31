@@ -166,3 +166,29 @@
   }
 }
 
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--gym-gray-border);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--gym-yellow);
+  }
+
+  .filter-underline-animate {
+    @apply animate-in fade-in slide-in-from-left-2 duration-300;
+  }
+}
+
+select option {
+  background-color: #1a1a1a; /* Matching --gym-gray */
+  color: white;
+  padding: 10px;
+}
+
