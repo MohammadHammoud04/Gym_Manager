@@ -34,7 +34,13 @@ const memberSchema = new mongoose.Schema(
           required: true
         }
       }
-    ]
+    ],
+    info: {
+      bloodType: { type: String, default: "" },
+      address: { type: String, default: "" },
+      reference: { type: String, default: "" },
+      injury: { type: String, default: "" }
+    }
   },
   { timestamps: true }
 );
@@ -44,7 +50,7 @@ memberSchema.index(
   { unique: true }
 );
 
-memberSchema.pre("validate", function (next) {
+memberSchema.pre("validate", function () {
   if (this.name) {
     const cleaned = this.name.trim().replace(/\s+/g, " ");
     this.name = cleaned
@@ -60,7 +66,6 @@ memberSchema.pre("validate", function (next) {
   if (this.phone) {
     this.phone = this.phone.trim();
   }
-  next();
+  // No next() call needed for synchronous hooks in modern Mongoose
 });
-
 module.exports = mongoose.model("Member", memberSchema);

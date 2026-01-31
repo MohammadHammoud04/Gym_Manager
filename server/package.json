@@ -1,27 +1,52 @@
 {
-  "name": "server",
-  
+  "name": "gym_manager",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "client/electron/main.cjs",
+  "description": "Gym Management System",
+  "author": "Mohammad",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "concurrently \"cd server && npx nodemon index.js\" \"cd client && npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "cd client && npm run build && cd ../server && npm install --production && mv node_modules modules_prod && cd .. && electron-builder"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "bcryptjs": "^3.0.3",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "electron-is-dev": "^3.0.1",
-    "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
-    "mongoose": "^8.21.0"
+  "build": {
+    "appId": "com.gym.manager",
+    "productName": "B7Gym",
+    "win": {
+      "target": "nsis",
+      "icon": "client/electron/favicon.ico",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "installerIcon": "client/electron/favicon.ico"
+    },
+    "files": [
+      "client/dist/**/*",
+      "client/electron/**/*",
+      "package.json",
+      "server/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "server/config.json",
+        "to": "config.json"
+      }
+    ],
+    "asar": true,
+    "directories": {
+      "output": "dist_electron"
+    }
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
+    "concurrently": "^9.2.1",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.4.0",
+    "wait-on": "^9.0.3"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.1.5"
   }
 }

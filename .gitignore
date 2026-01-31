@@ -12,6 +12,7 @@ build/
 !.env.example
 server/migrateExpenses.js
 server/scripts/
+server/config.json
 
 >>>>>>> 3feeadc (Initial Commit: Gym Manager)
 logs

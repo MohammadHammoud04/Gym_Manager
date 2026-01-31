@@ -15,8 +15,14 @@ export default function Members() {
   const [search, setSearch] = useState("")
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [membershipDetails, setMembershipDetails] = useState(null)
-  // 1. Added state for the success popup
   const [showSuccess, setShowSuccess] = useState(null)
+  const [infoModal, setInfoModal] = useState(null)
+  const [infoForm, setInfoForm] = useState({
+    bloodType: "",
+    address: "",
+    reference: "",
+    injury: ""
+  })
 
   const fetchMembers = async () => {
     const res = await axios.get("http://localhost:5000/members")
@@ -162,6 +168,59 @@ export default function Members() {
         </div>
       )}
 
+      {infoModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-4">
+              Member Information
+            </h3>
+
+            <div className="space-y-3">
+              {[
+                ["bloodType", "Blood Type"],
+                ["address", "Address"],
+                ["reference", "Reference"],
+                ["injury", "Injury"]
+              ].map(([key, label]) => (
+                <input
+                  key={key}
+                  className="w-full px-4 py-3 rounded-xl bg-gym-gray border-2 border-gym-gray-border
+                            text-white placeholder:text-gym-gray-text focus:border-gym-yellow"
+                  placeholder={label}
+                  value={infoForm[key]}
+                  onChange={(e) =>
+                    setInfoForm({ ...infoForm, [key]: e.target.value })
+                  }
+                />
+              ))}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setInfoModal(null)}
+                className="flex-1 px-4 py-3 rounded-xl border-2 border-gym-gray-border text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  await axios.put(
+                    `http://localhost:5000/members/${infoModal._id}`,
+                    { info: infoForm }
+                  )
+                  setInfoModal(null)
+                  fetchMembers()
+                }}
+                className="flex-1 px-4 py-3 rounded-xl bg-gym-yellow text-gym-black-dark font-bold"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       {/* Header Section */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
@@ -267,9 +326,23 @@ export default function Members() {
                 >
                   <Trash2 className="w-5 h-5 text-red-500" />
                 </button>
-                <div className="w-12 h-12 rounded-full bg-gym-yellow/10 border-2 border-gym-yellow flex items-center justify-center">
+                <button
+                  onClick={() => {
+                    setInfoModal(member)
+                    setInfoForm(member.info || {
+                      bloodType: "",
+                      address: "",
+                      reference: "",
+                      injury: ""
+                    })
+                  }}
+                  className="w-12 h-12 rounded-full bg-gym-yellow/10 border-2 border-gym-yellow
+                            flex items-center justify-center hover:bg-gym-yellow hover:text-gym-black-dark transition-all"
+                  title="Member info"
+                >
                   <Users className="w-6 h-6 text-gym-yellow" />
-                </div>
+                </button>
+
               </div>
             </div>
 
@@ -285,19 +358,29 @@ export default function Members() {
                   .map((mem) => (
                     <div
                       key={mem._id}
-                      className="px-3 py-1.5 rounded-lg text-sm font-semibold border-2 border-gym-yellow bg-gym-yellow/5 text-gym-yellow cursor-pointer hover:bg-gym-yellow hover:text-gym-black-dark transition-all transform hover:scale-105"
+                      className={`
+                        px-3 py-1.5 rounded-lg text-sm font-semibold border-2 cursor-pointer
+                        transition-all transform hover:scale-105
+                        ${
+                          mem.daysLeft <= 0
+                            ? "border-gray-500 bg-gray-500/10 text-gray-400 cursor-not-allowed"
+                            : mem.daysLeft <= 4
+                            ? "border-red-500 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white"
+                            : "border-gym-yellow bg-gym-yellow/5 text-gym-yellow hover:bg-gym-yellow hover:text-gym-black-dark"
+                        }
+                      `}
                       onClick={() =>
+                        mem.daysLeft > 0 &&
                         setMembershipDetails({
-                          // 3. Added optional chaining (?.) here to fix the crash
                           category: mem.membershipType?.category || "N/A",
                           startDate: mem.startDate,
                           endDate: mem.endDate,
                         })
                       }
                     >
-                      {/* 4. Added optional chaining (?.) here too */}
-                      {mem.membershipType?.category || "Unknown"}
+                      {mem.membershipType?.category || "Unknown"} ({mem.daysLeft}d)
                     </div>
+
                   ))}
 
                 {(!member.memberships || member.memberships.filter((mem) => mem.membershipType).length === 0) && (

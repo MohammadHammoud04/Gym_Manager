@@ -9,19 +9,26 @@ router.post("/", async (req, res) => {
   try {
     let { name, phone, memberships } = req.body;
 
-    name = name.trim();
-    phone = phone.trim();
-    const nameNormalized = name.toLowerCase();
+    if (!name || !phone) {
+      return res.status(400).json({ error: "Name and phone are required" });
+    }
 
+    const nameTrimmed = name.trim();
+    const phoneTrimmed = phone.trim();
+    const nameNormalized = nameTrimmed.toLowerCase();
+
+    // 1. Find existing member
     let member = await Member.findOne({
       nameNormalized,
-      phone
+      phone: phoneTrimmed
     });
 
+    // 2. Create new member if not found
     if (!member) {
       member = new Member({
-        name,
-        phone,
+        name: nameTrimmed,
+        phone: phoneTrimmed,
+        nameNormalized, // Explicitly provide this for the required check
         memberships: []
       });
     }
@@ -29,12 +36,14 @@ router.post("/", async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // 3. Process memberships
     for (const m of memberships) {
       const membershipType = await MembershipType.findById(m.membershipTypeId);
       if (!membershipType) continue;
 
       let existingMembership = null;
 
+      // Find if they already have a membership in this category
       for (const mem of member.memberships) {
         const memType = await MembershipType.findById(mem.membershipType);
         if (memType && memType.category === membershipType.category) {
@@ -49,17 +58,15 @@ router.post("/", async (req, res) => {
         const currentEnd = new Date(existingMembership.endDate);
         startDate = currentEnd > today ? currentEnd : today;
         endDate = new Date(startDate);
-        endDate.setDate(
-          endDate.getDate() + membershipType.durationInDays
-        );
+        endDate.setDate(endDate.getDate() + membershipType.durationInDays);
+        
         existingMembership.endDate = endDate;
         existingMembership.membershipType = membershipType._id;
       } else {
         startDate = new Date(today);
         endDate = new Date(startDate);
-        endDate.setDate(
-          endDate.getDate() + membershipType.durationInDays
-        );
+        endDate.setDate(endDate.getDate() + membershipType.durationInDays);
+        
         member.memberships.push({
           membershipType: membershipType._id,
           startDate,
@@ -68,30 +75,34 @@ router.post("/", async (req, res) => {
       }
     }
 
+    // 4. Save the member (This is where it was failing)
     await member.save();
 
-    const payments = await Promise.all(
-      memberships.map(async (m) => {
-        const membershipType = await MembershipType.findById(m.membershipTypeId);
-        if (!membershipType) return null;
-        return Payment.create({
+    // 5. Create payments
+    const payments = [];
+    for (const m of memberships) {
+      const membershipType = await MembershipType.findById(m.membershipTypeId);
+      if (membershipType) {
+        const payment = await Payment.create({
           member: member._id,
           membershipType: membershipType._id,
           amount: membershipType.price,
           date: new Date()
         });
-      })
-    );
+        payments.push(payment);
+      }
+    }
 
     res.status(201).json({
       member,
       payments: payments.filter(Boolean)
     });
+
   } catch (err) {
+    console.error("Member Route Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
-
 
 // renew membership
 router.post("/:id/renew", async (req, res) => {

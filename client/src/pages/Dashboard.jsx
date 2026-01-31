@@ -8,11 +8,11 @@ import {
 } from "lucide-react"
 
 export default function Dashboard() {
-  // --- SYNC & STATUS STATE ---
-  const [syncStatus, setSyncStatus] = useState("idle"); // idle, syncing, success, error
+  const [syncStatus, setSyncStatus] = useState("idle");
+  const [syncError, setSyncError] = useState("");
   const [dbMode, setDbMode] = useState("Checking...");
+  const [isLoading, setIsLoading] = useState(true);
 
-  // --- PROFIT & ANALYTICS STATE ---
   const [totalProfit, setTotalProfit] = useState(0)
   const [profitByClass, setProfitByClass] = useState([])
   const [todayProfit, setTodayProfit] = useState(0)
@@ -20,12 +20,10 @@ export default function Dashboard() {
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [totalExpenses, setTotalExpenses] = useState(0)
 
-  // --- DATE RANGE STATE ---
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [rangeProfit, setRangeProfit] = useState(0)
 
-  // Helper: Fetch Range Profit
   const fetchRangeProfit = async (start, end, setter) => {
     try {
       const res = await axios.get(`http://localhost:5000/profit/range?start=${start}&end=${end}`)
@@ -35,11 +33,10 @@ export default function Dashboard() {
     }
   }
 
-  // Handle Sync (Backup or Pull)
   const handleSync = async (type) => {
     setSyncStatus("syncing");
+    setSyncError("");
     try {
-      // type is either 'full-sync' (Backup) or 'pull-from-cloud' (Restore)
       const res = await axios.post(`http://localhost:5000/sync/${type}`);
       if (res.data.success) {
         setSyncStatus("success");
@@ -47,19 +44,22 @@ export default function Dashboard() {
       }
     } catch (err) {
       setSyncStatus("error");
-      setTimeout(() => setSyncStatus("idle"), 4000);
+      setSyncError(err.response?.data?.error || "Sync failed. Check console.");
+      setTimeout(() => {
+        setSyncStatus("idle");
+        setSyncError("");
+      }, 5000);
       console.error("Sync Error:", err);
     }
   };
 
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true);
       try {
-        // Check DB Connection Mode (Local vs Cloud)
         const statusRes = await axios.get("http://localhost:5000/api/db-status");
         setDbMode(statusRes.data.mode);
 
-        // Date logic for Today and Month Start
         const now = new Date();
         const offset = now.getTimezoneOffset() * 60000;
         const todayStr = new Date(now - offset).toISOString().split("T")[0];
@@ -69,23 +69,22 @@ export default function Dashboard() {
         setStartDate(todayStr);
         setEndDate(todayStr);
 
-        // Fetch Main Totals
         const totalRes = await axios.get("http://localhost:5000/profit/total");
         setTotalProfit(totalRes.data.netProfit);
         setTotalExpenses(totalRes.data.expenses);
         setTotalRevenue(totalRes.data.revenue);
 
-        // Fetch Class Breakdown
         const byClassRes = await axios.get("http://localhost:5000/profit/by-class");
         setProfitByClass(byClassRes.data);
 
-        // Fetch Quick Stats
         await fetchRangeProfit(todayStr, todayStr, setTodayProfit);
         await fetchRangeProfit(monthStartStr, todayStr, setMonthProfit);
         
       } catch (err) {
         console.error("Dashboard fetch error:", err);
         setDbMode("Offline");
+      } finally {
+        setIsLoading(false);
       }
     };
   
@@ -100,7 +99,6 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gym-black p-6 lg:p-8">
       
-      {/* --- HEADER & SYNC CENTER --- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6 bg-gym-gray-dark p-6 rounded-2xl border-2 border-gym-gray-border shadow-2xl">
         <div>
           <div className="flex items-center gap-3 mb-2">
@@ -112,42 +110,14 @@ export default function Dashboard() {
             <p className="text-gym-gray-text text-xs font-bold uppercase tracking-wider">{dbMode}</p>
           </div>
         </div>
-
-        <div className="flex flex-wrap gap-3">
-          {/* Restore Button */}
-          <button 
-            onClick={() => handleSync('pull-from-cloud')}
-            disabled={syncStatus === 'syncing'}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gym-gray border-2 border-gym-gray-border text-white rounded-xl hover:border-blue-500 hover:text-blue-400 transition-all text-sm font-bold disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-            Restore from Cloud
-          </button>
-
-          {/* Backup Button */}
-          <button 
-            onClick={() => handleSync('full-sync')}
-            disabled={syncStatus === 'syncing'}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl transition-all shadow-lg font-bold text-sm ${
-              syncStatus === 'success' ? 'bg-green-600 text-white' :
-              syncStatus === 'error' ? 'bg-red-600 text-white' :
-              'bg-gym-yellow text-gym-black hover:bg-gym-yellow-bright'
-            }`}
-          >
-            {syncStatus === 'syncing' ? <RefreshCw className="w-4 h-4 animate-spin" /> : 
-             syncStatus === 'success' ? <CheckCircle className="w-4 h-4" /> :
-             syncStatus === 'error' ? <AlertCircle className="w-4 h-4" /> :
-             <CloudUpload className="w-4 h-4" />}
-            
-            {syncStatus === 'syncing' ? "Backing up..." : 
-             syncStatus === 'success' ? "Backup Ready" :
-             syncStatus === 'error' ? "Sync Failed" : 
-             "Backup to Cloud"}
-          </button>
-        </div>
       </div>
 
-      {/* --- QUICK STATS CARDS --- */}
+      {syncError && (
+        <div className="mb-6 bg-red-500/10 border border-red-500 text-red-400 p-3 rounded-xl text-sm">
+          {syncError}
+        </div>
+      )}
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5 mb-8">
         <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-xl">
           <p className="text-gym-gray-text text-xs font-semibold mb-1">TOTAL REVENUE</p>
@@ -180,10 +150,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* --- MAIN CONTENT GRID --- */}
       <div className="grid lg:grid-cols-2 gap-8">
         
-        {/* Profit by Class */}
         <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
           <div className="flex items-center gap-2 mb-6">
             <TrendingUp className="w-6 h-6 text-gym-yellow" />
@@ -203,7 +171,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Date Range Search */}
         <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
           <div className="flex items-center gap-2 mb-6">
             <Search className="w-6 h-6 text-gym-yellow" />

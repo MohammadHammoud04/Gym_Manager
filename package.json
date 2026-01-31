@@ -5,7 +5,7 @@
   "description": "Gym Management System",
   "author": "Mohammad",
   "scripts": {
-    "dev": "concurrently \"cd server && npx nodemon index.js\" \"cd client && npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev": "concurrently \"cd client && npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "cd client && npm run build && cd ../server && npm install --production && mv node_modules modules_prod && cd .. && electron-builder"
   },
   "build": {
@@ -23,10 +23,15 @@
       "client/dist/**/*",
       "client/electron/**/*",
       "package.json",
-      "server/**/*"
+      "server/**/*",
+      "!server/node_modules"
     ],
     "extraResources": [
-      ".env",
+      "server/.env",
+      {
+        "from": ".env",
+        "to": "."
+      },
       {
         "from": "server",
         "to": "server",
@@ -37,11 +42,11 @@
       },
       {
         "from": "server/node_modules",
-        "to": "server/node_modules",
-        "filter": [
-          "**/*"
-        ]
+        "to": "server/node_modules"
       }
+    ],
+    "asarUnpack": [
+      "server/**/*"
     ],
     "asar": true,
     "directories": {
