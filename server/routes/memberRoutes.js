@@ -3,11 +3,12 @@ const router = express.Router();
 const Member = require("../models/Member");
 const MembershipType = require("../models/MembershipType");
 const Payment = require("../models/Payment");
+const PTSession = require("../models/PTSession"); // Import the new model
 
 // create or extend member
 router.post("/", async (req, res) => {
   try {
-    let { name, phone, memberships } = req.body;
+    let { name, phone, memberships, ptDetails } = req.body;
 
     if (!name || !phone) {
       return res.status(400).json({ error: "Name and phone are required" });
@@ -17,18 +18,13 @@ router.post("/", async (req, res) => {
     const phoneTrimmed = phone.trim();
     const nameNormalized = nameTrimmed.toLowerCase();
 
-    // 1. Find existing member
-    let member = await Member.findOne({
-      nameNormalized,
-      phone: phoneTrimmed
-    });
-
-    // 2. Create new member if not found
+    // Find or create member
+    let member = await Member.findOne({ nameNormalized, phone: phoneTrimmed });
     if (!member) {
       member = new Member({
         name: nameTrimmed,
         phone: phoneTrimmed,
-        nameNormalized, // Explicitly provide this for the required check
+        nameNormalized,
         memberships: []
       });
     }
@@ -36,147 +32,192 @@ router.post("/", async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // 3. Process memberships
-    for (const m of memberships) {
-      const membershipType = await MembershipType.findById(m.membershipTypeId);
-      if (!membershipType) continue;
+    const createdPayments = [];
 
-      let existingMembership = null;
+    // 1. Process memberships with CATEGORY STACKING
+    for (const m of (memberships || [])) {
+      const newType = await MembershipType.findById(m.membershipTypeId);
+      if (!newType) continue;
 
-      // Find if they already have a membership in this category
-      for (const mem of member.memberships) {
-        const memType = await MembershipType.findById(mem.membershipType);
-        if (memType && memType.category === membershipType.category) {
-          existingMembership = mem;
-          break;
-        }
-      }
+      // Populate to see categories of existing memberships
+      await member.populate("memberships.membershipType");
+
+      // Find if member already has a membership in this category (e.g., "Gym")
+      let existingMembership = member.memberships.find(mem => 
+        mem.membershipType && mem.membershipType.category === newType.category
+      );
 
       let startDate, endDate;
 
       if (existingMembership) {
+        // STACKING LOGIC: Start from existing end date if it's in the future
         const currentEnd = new Date(existingMembership.endDate);
         startDate = currentEnd > today ? currentEnd : today;
         endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + membershipType.durationInDays);
+        endDate.setDate(endDate.getDate() + newType.durationInDays);
         
         existingMembership.endDate = endDate;
-        existingMembership.membershipType = membershipType._id;
+        existingMembership.membershipType = newType._id; // Update to latest type purchased
       } else {
+        // NEW CATEGORY: Start from today
         startDate = new Date(today);
         endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + membershipType.durationInDays);
-        
-        member.memberships.push({
-          membershipType: membershipType._id,
-          startDate,
-          endDate
-        });
+        endDate.setDate(endDate.getDate() + newType.durationInDays);
+        member.memberships.push({ membershipType: newType._id, startDate, endDate });
       }
+
+      // Create Payment for this membership
+      const discount = Number(m.discount || 0);
+      const p = await Payment.create({
+        member: member._id,
+        membershipType: newType._id,
+        originalAmount: newType.price,
+        discount: discount,
+        amount: newType.price - discount,
+        date: new Date(),
+        category: "Membership"
+      });
+      createdPayments.push(p);
     }
 
-    // 4. Save the member (This is where it was failing)
     await member.save();
 
-    // 5. Create payments
-    const payments = [];
-    for (const m of memberships) {
-      const membershipType = await MembershipType.findById(m.membershipTypeId);
-      if (membershipType) {
-        
-        const discount = Math.max(0, Number(m.discount || 0))
-        const originalAmount = membershipType.price
-        const finalAmount = Math.max(0, originalAmount - discount)
+    // 2. Process PT Logic
+    if (ptDetails && ptDetails.coachName && ptDetails.coachName.trim() !== "") {
+      const numSessions = Number(ptDetails.sessions || 0);
+      const sessionPrice = Number(ptDetails.price || 0);
 
-        const payment = await Payment.create({
+      if (numSessions > 0) {
+        await PTSession.findOneAndUpdate(
+          { member: member._id, coachName: ptDetails.coachName.trim() },
+          { 
+            $inc: { sessionsLeft: numSessions },
+            $set: { type: ptDetails.type, pricePerSession: sessionPrice }
+          },
+          { upsert: true }
+        );
+
+        const ptPay = await Payment.create({
           member: member._id,
-          membershipType: membershipType._id,
-          originalAmount,
-          discount,
-          amount: finalAmount,
-          date: new Date()
-        })
-        payments.push(payment);
+          originalAmount: numSessions * sessionPrice,
+          discount: 0,
+          amount: numSessions * sessionPrice,
+          date: new Date(),
+          coachName: ptDetails.coachName.trim(),
+          ptSessions: numSessions,
+          category: "PT" 
+        });
+        createdPayments.push(ptPay);
       }
     }
 
-    res.status(201).json({
-      member,
-      payments: payments.filter(Boolean)
-    });
-
+    res.status(201).json({ member, payments: createdPayments });
   } catch (err) {
-    console.error("Member Route Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // renew membership
 router.post("/:id/renew", async (req, res) => {
-  const { membershipTypeId } = req.body;
+  const { membershipTypeId, ptDetails } = req.body;
 
   try {
     const member = await Member.findById(req.params.id);
     if (!member) return res.status(404).json({ error: "Member not found" });
 
-    const newMembershipType = await MembershipType.findById(membershipTypeId);
-    if (!newMembershipType) return res.status(404).json({ error: "Membership type not found" });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const createdPayments = [];
 
-    // Find membership with the same category
-    let existing = null;
-    for (let m of member.memberships) {
-      const memType = await MembershipType.findById(m.membershipType);
-      if (memType && memType.category === newMembershipType.category) {
-        existing = m;
-        break;
+    // 1. Membership Renewal with CATEGORY STACKING
+    if (membershipTypeId) {
+      const newType = await MembershipType.findById(membershipTypeId);
+      if (newType) {
+        await member.populate("memberships.membershipType");
+
+        let existing = member.memberships.find(mem => 
+          mem.membershipType && mem.membershipType.category === newType.category
+        );
+
+        if (existing) {
+          const currentEnd = new Date(existing.endDate);
+          const startDate = currentEnd > today ? currentEnd : today;
+          const endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + newType.durationInDays);
+          existing.endDate = endDate;
+          existing.membershipType = newType._id;
+        } else {
+          const startDate = new Date(today);
+          const endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + newType.durationInDays);
+          member.memberships.push({ membershipType: newType._id, startDate, endDate });
+        }
+
+        const p = await Payment.create({
+          member: member._id,
+          membershipType: newType._id,
+          originalAmount: newType.price,
+          discount: 0,
+          amount: newType.price,
+          date: new Date(),
+          category: "Membership"
+        });
+        createdPayments.push(p);
       }
     }
 
-    let startDate, endDate;
-    const today = new Date();
+    // 2. PT Renewal
+    if (ptDetails && ptDetails.coachName) {
+      const num = Number(ptDetails.sessions);
+      const price = Number(ptDetails.price);
+      await PTSession.findOneAndUpdate(
+        { member: member._id, coachName: ptDetails.coachName.trim() },
+        { $inc: { sessionsLeft: num }, $set: { pricePerSession: price } },
+        { upsert: true }
+      );
 
-    if (existing) {
-      const currentEndDate = new Date(existing.endDate);
-
-      // If the membership is still active, start from the end date.
-      startDate = currentEndDate > today ? currentEndDate : today;
-      
-      endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + newMembershipType.durationInDays);
-
-      existing.endDate = endDate;
-      // Also update the membershipType ID in case they upgraded (e.g., from Bronze to Gold)
-      existing.membershipType = newMembershipType._id;
-
-    } else {
-      // No membership in this category exists yet
-      startDate = new Date();
-      endDate = new Date();
-      endDate.setDate(endDate.getDate() + newMembershipType.durationInDays);
-
-      member.memberships.push({
-        membershipType: newMembershipType._id,
-        startDate,
-        endDate
+      const ptPay = await Payment.create({
+        member: member._id,
+        originalAmount: num * price,
+        discount: 0,
+        amount: num * price,
+        date: new Date(),
+        category: "PT",
+        coachName: ptDetails.coachName.trim(),
+        ptSessions: num
       });
+      createdPayments.push(ptPay);
     }
 
     await member.save();
-
-    // Create payment for renewal
-    const payment = await Payment.create({
-      member: member._id,
-      membershipType: newMembershipType._id,
-      amount: newMembershipType.price,
-      date: new Date()
-    });
-
-    res.json({ member, payment });
-
+    res.json({ member, payments: createdPayments });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});  
+});
+
+router.patch("/:id/decrement-pt", async (req, res) => {
+  const { coachName } = req.body;
+  try {
+    const session = await PTSession.findOneAndUpdate(
+      { 
+        member: req.params.id, 
+        coachName: coachName,
+        sessionsLeft: { $gt: 0 } // ONLY if sessions are greater than 0
+      },
+      { $inc: { sessionsLeft: -1 } },
+      { new: true }
+    );
+
+    if (!session) {
+      return res.status(400).json({ error: "No sessions remaining or session not found" });
+    }
+    
+    res.json(session);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 //get all payments for a member
 router.get("/:id/payments", async(req,res)=>{
@@ -196,27 +237,11 @@ router.get("/:id/payments", async(req,res)=>{
 router.get("/", async (req, res) => {
   try {
     const members = await Member.find().populate("memberships.membershipType");
-
-    const today = new Date();
-    const warningDays = 7; // memberships expiring within 7 days
-
-    const membersWithExpiryFlag = members.map((member) => {
-      const memberships = member.memberships.map((m) => {
-        const daysLeft = (new Date(m.endDate) - today) / (1000 * 60 * 60 * 24);
-        return {
-          ...m._doc,
-          isExpiringSoon: daysLeft <= warningDays,
-          daysLeft: Math.ceil(daysLeft)
-        };
-      });
-
-      return {
-        ...member._doc,
-        memberships
-      };
-    });
-
-    res.json(membersWithExpiryFlag);
+    const membersWithPT = await Promise.all(members.map(async (m) => {
+      const pt = await PTSession.find({ member: m._id });
+      return { ...m._doc, personalTraining: pt };
+    }));
+    res.json(membersWithPT);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

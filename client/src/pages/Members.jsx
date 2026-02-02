@@ -12,6 +12,12 @@ export default function Members() {
     phone: "",
     memberships: [],
   })
+  const [ptForm, setPtForm] = useState({
+    coachName: "",
+    type: "Member",
+    sessions: 0,
+    price: 0
+  });
   const [search, setSearch] = useState("")
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [membershipDetails, setMembershipDetails] = useState(null)
@@ -63,6 +69,16 @@ export default function Members() {
     }
   }
 
+  const handleDecrement = async (memberId, coachName) => {
+    try {
+      await axios.patch(`http://localhost:5000/members/${memberId}/decrement-pt`, { coachName });
+      fetchMembers(); // Refresh the list to show new session count
+    } catch (err) {
+      console.error("Error decrementing PT session:", err);
+      alert("Failed to decrement session");
+    }
+  };
+
   useEffect(() => {
     fetchMembershipTypes()
   }, [])
@@ -75,18 +91,31 @@ export default function Members() {
 
   const handleAddMember = async () => {
     try {
-      const res = await axios.post("http://localhost:5000/members", newMember)
+      // We combine the base member info with the PT form state
+      const payload = {
+        ...newMember,
+        ptDetails: ptForm // Add the PT state here
+      };
+  
+      const res = await axios.post("http://localhost:5000/members", payload);
+      
       setShowSuccess({
         name: res.data.member.name,
-        count: res.data.payments.length
-      })
-      setNewMember({ name: "", phone: "", memberships: [] })
-      await fetchMembers()
+        // If a PT payment was made, it will be in the database, 
+        // but res.data.payments only contains the membership ones in your current code.
+        count: res.data.payments.length 
+      });
+  
+      // Reset both forms
+      setNewMember({ name: "", phone: "", memberships: [] });
+      setPtForm({ coachName: "", type: "Member", sessions: 0, price: 0 }); // Reset PT form
+      
+      await fetchMembers();
     } catch (err) {
-      console.error(err)
-      alert("Error adding member. Make sure fields are correct.")
+      console.error(err);
+      alert("Error adding member. Make sure fields are correct.");
     }
-  }
+  };
 
   const handleDeleteMember = async (memberId) => {
     try {
@@ -116,42 +145,58 @@ export default function Members() {
     m.phone.includes(search)
   )
   .map((m) => {
-    // Compute daysLeft for all memberships
+    // 1. Compute daysLeft for all memberships for this member
     const membershipsWithDays = m.memberships?.map(mem => ({
       ...mem,
       daysLeft: computeDaysLeft(mem.endDate)
-    })) || []
+    })) || [];
 
-    let filteredMemberships = membershipsWithDays
-
+    // 2. Tab Filtering Logic
     if (memberFilter === "inactive") {
-      // Only keep expired memberships
-      filteredMemberships = membershipsWithDays.filter(mem => mem.daysLeft <= 0)
-      if (filteredMemberships.length === 0) return null // exclude member if no expired memberships
-    } else if (memberFilter === "expiring") {
-      // Only keep memberships expiring soon (1-4 days)
-      filteredMemberships = membershipsWithDays.filter(mem => mem.daysLeft > 0 && mem.daysLeft <= 4)
-      if (filteredMemberships.length === 0) return null // exclude member if no expiring memberships
+      const expired = membershipsWithDays.filter(mem => mem.daysLeft <= 0);
+      // If member has no expired memberships, remove them from list
+      if (expired.length === 0) return null;
+      return { ...m, memberships: expired };
+    } 
+    
+    if (memberFilter === "expiring") {
+      const soon = membershipsWithDays.filter(mem => mem.daysLeft > 0 && mem.daysLeft <= 4);
+      // If member has no memberships expiring in 1-4 days, remove them
+      if (soon.length === 0) return null;
+      return { ...m, memberships: soon };
+    } 
+    
+    if (memberFilter === "pt") {
+      // Check if they have ANY coach record with sessions remaining
+      const hasPT = m.personalTraining && m.personalTraining.some(pt => pt.sessionsLeft > 0);
+      if (!hasPT) return null;
     }
 
+    // 3. Category Dropdown Sorting/Filtering Logic
+    if (sortCategory) {
+      if (sortCategory === "PT") {
+        const hasPT = m.personalTraining && m.personalTraining.some(pt => pt.sessionsLeft > 0);
+        if (!hasPT) return null;
+      } else {
+        const hasCategory = membershipsWithDays.some(mem => mem.membershipType?.category === sortCategory);
+        if (!hasCategory) return null;
+      }
+    }
+
+    // Return the member object with the calculated daysLeft memberships
     return {
       ...m,
-      memberships: filteredMemberships
-    }
+      memberships: membershipsWithDays
+    };
   })
-  .filter(Boolean) // remove nulls
-  .filter((m) => {
-    if (!sortCategory) return true
-    return m.memberships?.some(mem => (mem.membershipType?.category || mem.category) === sortCategory)
-  })
+  .filter(Boolean) // This removes all the 'null' entries we returned above
   .sort((a, b) => {
-    if (!sortCategory) return 0
-    const aMem = a.memberships?.find(mem => (mem.membershipType?.category || mem.category) === sortCategory)
-    const bMem = b.memberships?.find(mem => (mem.membershipType?.category || mem.category) === sortCategory)
-    const aDays = aMem ? aMem.daysLeft : 0
-    const bDays = bMem ? bMem.daysLeft : 0
-    return aDays - bDays
-  })
+    // Optional: If sorting by a membership category, put those expiring soonest at the top
+    if (!sortCategory || sortCategory === "PT") return 0;
+    const aMem = a.memberships?.find(mem => mem.membershipType?.category === sortCategory);
+    const bMem = b.memberships?.find(mem => mem.membershipType?.category === sortCategory);
+    return (aMem?.daysLeft || 0) - (bMem?.daysLeft || 0);
+  });
 
   return (
     <div className="min-h-screen bg-gym-black p-6 lg:p-8 font-sans selection:bg-gym-yellow selection:text-gym-black">
@@ -381,6 +426,80 @@ export default function Members() {
           </div>
         </div>
 
+        {/* --- Personal Training Section --- */}
+    <div className="mt-8 pt-6 border-t border-gym-gray-border/50">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="p-1.5 bg-gym-yellow/10 rounded-md">
+          <Users className="w-4 h-4 text-gym-yellow" />
+        </div>
+        <h3 className="text-sm font-black text-white uppercase tracking-widest">
+          Personal Training <span className="text-gym-gray-text text-[10px] font-normal ml-2">(Optional)</span>
+        </h3>
+      </div>
+
+      <div className="bg-gym-black/40 border-2 border-gym-gray-border rounded-xl p-4 space-y-4">
+        {/* Coach Name & Type */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[9px] font-black uppercase text-gym-gray-text mb-1.5 ml-1 tracking-widest">Coach Name</label>
+            <input
+              type="text"
+              placeholder="Ex: Coach Alex"
+              className="w-full px-4 py-2.5 rounded-lg bg-gym-gray border-2 border-gym-gray-border text-white text-sm focus:border-gym-yellow outline-none transition-all"
+              value={ptForm.coachName}
+              onChange={(e) => setPtForm({ ...ptForm, coachName: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block text-[9px] font-black uppercase text-gym-gray-text mb-1.5 ml-1 tracking-widest">Client Type</label>
+            <select
+              className="w-full px-4 py-2.5 rounded-lg bg-gym-gray border-2 border-gym-gray-border text-white text-sm focus:border-gym-yellow outline-none appearance-none cursor-pointer"
+              value={ptForm.type}
+              onChange={(e) => setPtForm({ ...ptForm, type: e.target.value })}
+            >
+              <option value="Member">Gym Member</option>
+              <option value="Daily Access">Daily Access</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Sessions & Price */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[9px] font-black uppercase text-gym-gray-text mb-1.5 ml-1 tracking-widest">Num. Sessions</label>
+            <input
+              type="number"
+              placeholder="0"
+              className="w-full px-4 py-2.5 rounded-lg bg-gym-gray border-2 border-gym-gray-border text-white text-sm focus:border-gym-yellow outline-none transition-all"
+              value={ptForm.sessions || ""}
+              onChange={(e) => setPtForm({ ...ptForm, sessions: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block text-[9px] font-black uppercase text-gym-gray-text mb-1.5 ml-1 tracking-widest">Price / Session</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gym-yellow text-xs font-bold">$</span>
+              <input
+                type="number"
+                placeholder="0"
+                className="w-full pl-7 pr-4 py-2.5 rounded-lg bg-gym-gray border-2 border-gym-gray-border text-white text-sm focus:border-gym-yellow outline-none transition-all"
+                value={ptForm.price || ""}
+                onChange={(e) => setPtForm({ ...ptForm, price: e.target.value })}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic Total Cost Display */}
+        {ptForm.sessions > 0 && ptForm.price > 0 && (
+          <div className="mt-2 flex justify-between items-center p-3 bg-gym-yellow/5 border border-gym-yellow/20 rounded-lg">
+            <span className="text-[10px] font-black text-gym-gray-text uppercase tracking-widest">Total PT Revenue</span>
+            <span className="text-sm font-black text-gym-yellow">${ptForm.sessions * ptForm.price}</span>
+          </div>
+        )}
+      </div>
+    </div>
+
         <button
           className="w-full mt-10 bg-gym-yellow text-gym-black-dark font-black py-4 px-6 rounded-xl hover:bg-gym-yellow-bright transition-all transform hover:scale-[1.01] active:scale-[0.99] shadow-lg flex items-center justify-center gap-3 uppercase tracking-widest"
           onClick={handleAddMember}
@@ -395,6 +514,7 @@ export default function Members() {
         <div className="flex flex-wrap items-center gap-x-10 gap-y-4">
           {[
             { id: "all", label: "All Members" },
+            { id: "pt", label: "Personal Training" },
             { id: "inactive", label: "Inactive" },
             { id: "expiring", label: "Expiring Soon" }
           ].map((filter) => (
@@ -426,6 +546,7 @@ export default function Members() {
               className="w-full appearance-none px-4 py-3 rounded-xl bg-gym-gray-dark text-white border-2 border-gym-gray-border focus:border-gym-yellow outline-none font-bold text-sm cursor-pointer transition-all hover:bg-gym-gray-border/30"
             >
               <option value="">No Sorting</option>
+              <option value="PT">Personal Training (PT)</option>
               {[...new Set(membershipTypes.map(m => m.category))].map((cat) => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
@@ -463,36 +584,66 @@ export default function Members() {
               </div>
             </div>
 
+            {/* Memberships with Days Left */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-gym-gray-text border-b border-gym-gray-border/50 pb-2">
                 <Calendar className="w-3.5 h-3.5 text-gym-yellow" />
                 <p className="text-[10px] font-black uppercase tracking-widest">Active Memberships</p>
               </div>
               <div className="flex flex-wrap gap-2">
-              {member.memberships?.filter(m => m.membershipType).map((mem, idx) => {
-                const daysLeft = computeDaysLeft(mem.endDate)
-                return (
-                  <div
-                    key={mem._id || idx}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black border-2 cursor-pointer transition-all ${
-                      daysLeft <= 0
-                        ? "border-gray-500/30 bg-gray-500/5 text-gray-500" // expired
-                        : daysLeft <= 4
-                        ? "border-red-500 bg-red-500/10 text-red-500" // expiring soon
-                        : "border-gym-yellow bg-gym-yellow/5 text-gym-yellow hover:bg-gym-yellow hover:text-gym-black-dark" // active
-                    }`}
-                    onClick={() => daysLeft > 0 && setMembershipDetails({
-                      category: mem.membershipType?.category || "N/A",
-                      startDate: mem.startDate,
-                      endDate: mem.endDate
-                    })}
-                  >
-                    {mem.membershipType?.category || "Unknown"} — {daysLeft}d
-                  </div>
-                )
-              })}
-
+                {member.memberships?.filter(m => m.membershipType).map((mem, idx) => {
+                  const daysLeft = computeDaysLeft(mem.endDate)
+                  return (
+                    <div
+                      key={mem._id || idx}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black border-2 cursor-pointer transition-all ${
+                        daysLeft <= 0
+                          ? "border-gray-500/30 bg-gray-500/5 text-gray-500"
+                          : daysLeft <= 4
+                          ? "border-red-500 bg-red-500/10 text-red-500"
+                          : "border-gym-yellow bg-gym-yellow/5 text-gym-yellow hover:bg-gym-yellow hover:text-gym-black-dark"
+                      }`}
+                      onClick={() => daysLeft > 0 && setMembershipDetails({
+                        category: mem.membershipType?.category || "N/A",
+                        startDate: mem.startDate,
+                        endDate: mem.endDate
+                      })}
+                    >
+                      {mem.membershipType?.category || "Unknown"} — {daysLeft}d
+                    </div>
+                  )
+                })}
               </div>
+
+              {/* Personal Training Display */}
+              {member.personalTraining && member.personalTraining.filter(pt => pt.sessionsLeft > 0).length > 0 && (
+                <div className="mt-4 pt-3 border-t border-gym-gray-border/30">
+                  <p className="text-[10px] font-black uppercase text-gym-gray-text mb-2 tracking-widest">
+                    Personal Training
+                  </p>
+                  <div className="space-y-2">
+                    {/* We filter out any session where sessionsLeft is 0 or less */}
+                    {member.personalTraining
+                      .filter(pt => pt.sessionsLeft > 0)
+                      .map((pt, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-gym-black/40 p-2 rounded-lg border border-gym-gray-border">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-white uppercase">{pt.coachName}</span>
+                            <span className={`text-[10px] font-black ${pt.sessionsLeft <= 2 ? 'text-red-500' : 'text-gym-yellow'}`}>
+                              {pt.sessionsLeft} Sessions Left
+                            </span>
+                          </div>
+                          <button 
+                            onClick={() => handleDecrement(member._id, pt.coachName)}
+                            className="px-3 py-1 bg-red-500/10 border border-red-500/50 text-red-500 text-[10px] font-black rounded hover:bg-red-500 hover:text-white transition-all uppercase"
+                          >
+                            -1 Session
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ))}

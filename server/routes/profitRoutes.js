@@ -4,6 +4,34 @@ const Payment = require("../models/Payment");
 const Expense = require("../models/Expense");
 const Sale = require("../models/Sale");
 
+// Profit per PT Coach
+router.get("/by-coach", async (req, res) => {
+  try {
+    const result = await Payment.aggregate([
+      // 1. Only PT payments
+      { $match: { category: "PT", coachName: { $exists: true, $ne: "" } } },
+
+      // 2. Group by coachName
+      {
+        $group: {
+          _id: "$coachName",                     // Coach name
+          total: { $sum: "$amount" },           // Total money earned
+          sessionsSold: { $sum: "$ptSessions" } // Total sessions sold
+        }
+      },
+
+      // 3. Sort by highest total profit
+      { $sort: { total: -1 } }
+    ]);
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 //total profit
 router.get("/total", async (req, res) => {
     try {
@@ -43,30 +71,31 @@ router.get("/total", async (req, res) => {
 
 // Profit per class
 router.get("/by-class", async (req, res) => {
-    try {
-        const result = await Payment.aggregate([
-          {
-            $lookup: {
-              from: "membershiptypes", // collection name (lowercase plural)
-              localField: "membershipType",
-              foreignField: "_id",
-              as: "membership"
-            }
-          },
-          { $unwind: "$membership" },
-          {
-            $group: {
-              _id: "$membership.category",
-              total: { $sum: "$amount" }
-            }
-          }
-        ]);
-    
-        res.json(result);
-      } catch (err) {
-        res.status(500).json({ error: err.message });
-      }
-    });
+  try {
+    const result = await Payment.aggregate([
+      {
+        $lookup: {
+          from: "membershiptypes", 
+          localField: "membershipType",
+          foreignField: "_id",
+          as: "membership"
+        }
+      },
+      { $unwind: { path: "$membership", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          // If membership category exists, use it. Otherwise, use the Payment category (e.g., "PT")
+          _id: { $ifNull: ["$membership.category", "$category"] },
+          total: { $sum: "$amount" }
+        }
+      },
+      { $sort: { total: -1 } }
+    ]);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
     
   router.get("/range", async (req, res) => {
       const { start, end } = req.query;

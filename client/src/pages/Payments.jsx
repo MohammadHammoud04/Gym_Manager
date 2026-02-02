@@ -27,10 +27,11 @@ export default function Payments() {
 
   const filteredRecent = recentPayments.filter((p) => {
     const memberName = p.member?.name?.toLowerCase() || ""
+    const coachName = p.coachName?.toLowerCase() || "";
     const membershipName = p.membershipType?.name?.toLowerCase() || ""
     const invoice = p.invoiceNumber?.toLowerCase() || ""
     const q = search.toLowerCase()
-    return memberName.includes(q) || membershipName.includes(q) || invoice.includes(q)
+    return memberName.includes(q) || membershipName.includes(q) || coachName.includes(q) || invoice.includes(q)
   })
 
   return (
@@ -74,8 +75,9 @@ export default function Payments() {
                         <User className="w-4 h-4 text-gym-yellow" />
                         <h3 className="text-lg font-bold text-white">{p.member.name}</h3>
                       </div>
-                      <p className="text-sm text-gym-gray-text">{p.membershipType?.name || "—"}</p>
-                    </div>
+                      <p className="text-sm text-gym-gray-text">
+                        {p.category === "PT" ? `PT: ${p.coachName}` : (p.membershipType?.name || "—")}
+                      </p>                    </div>
                     <div className="w-12 h-12 rounded-full bg-gym-yellow/10 border-2 border-gym-yellow flex items-center justify-center">
                       <CreditCard className="w-6 h-6 text-gym-yellow" />
                     </div>
@@ -139,8 +141,10 @@ export default function Payments() {
                 >
                   <div className="flex justify-between gap-4 flex-wrap">
                     <div>
-                      <p className="text-white font-semibold">{p.membershipType?.name || "—"}</p>
-                      <p className="text-sm text-gym-gray-text font-mono">{p.invoiceNumber}</p>
+                    <p className="text-white font-semibold">
+                      {p.category === "PT" ? `PT Session (${p.coachName})` : (p.membershipType?.name || "—")}
+                    </p>
+                    <p className="text-sm text-gym-gray-text font-mono">{p.invoiceNumber}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-gym-yellow font-bold">${p.amount}</p>

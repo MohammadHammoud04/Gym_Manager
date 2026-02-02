@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import axios from "axios"
 import { 
   TrendingUp, DollarSign, Calendar, BarChart3, Search, 
-  CloudUpload, RefreshCw, Database, CheckCircle, AlertCircle 
+  CloudUpload, RefreshCw, Database, CheckCircle, AlertCircle,Users
 } from "lucide-react"
 
 export default function Dashboard() {
@@ -12,7 +12,7 @@ export default function Dashboard() {
   const [syncError, setSyncError] = useState("");
   const [dbMode, setDbMode] = useState("Checking...");
   const [isLoading, setIsLoading] = useState(true);
-
+  const [profitByCoach, setProfitByCoach] = useState([]);
   const [totalProfit, setTotalProfit] = useState(0)
   const [profitByClass, setProfitByClass] = useState([])
   const [todayProfit, setTodayProfit] = useState(0)
@@ -59,7 +59,12 @@ export default function Dashboard() {
       try {
         const statusRes = await axios.get("http://localhost:5000/api/db-status");
         setDbMode(statusRes.data.mode);
-
+        try {
+          const coachRes = await axios.get("http://localhost:5000/profit/by-coach");
+          setProfitByCoach(coachRes.data);
+        } catch (e) {
+          console.error("Coach data failed, but continuing...", e);
+        }
         const now = new Date();
         const offset = now.getTimezoneOffset() * 60000;
         const todayStr = new Date(now - offset).toISOString().split("T")[0];
@@ -191,6 +196,54 @@ export default function Dashboard() {
           </div>
         </div>
 
+      </div>
+
+      <div className="mt-8 bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 bg-gym-yellow/10 rounded-lg">
+            <Users className="w-6 h-6 text-gym-yellow" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-white uppercase tracking-tight">Coach Performance</h2>
+            <p className="text-gym-gray-text text-xs font-bold uppercase tracking-widest">Personal Training Revenue</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {profitByCoach.length > 0 ? (
+            profitByCoach.map((coach) => (
+              <div key={coach._id} className="relative overflow-hidden bg-gym-black border border-gym-gray-border p-5 rounded-xl group hover:border-gym-yellow transition-all">
+                {/* Decorative background accent */}
+                <div className="absolute -right-4 -top-4 w-16 h-16 bg-gym-yellow/5 rounded-full blur-2xl group-hover:bg-gym-yellow/10 transition-all" />
+                
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <span className="text-[10px] font-black text-gym-gray-text uppercase tracking-[0.2em]">Lead Coach</span>
+                    <h3 className="text-lg font-black text-white uppercase">{coach._id}</h3>
+                  </div>
+                  <div className="bg-gym-yellow text-gym-black px-2 py-1 rounded font-black text-[10px] uppercase">
+                    Top Tier
+                  </div>
+                </div>
+
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-gym-gray-text text-[10px] font-bold uppercase mb-1">Total Generated</p>
+                    <p className="text-3xl font-black text-white">${coach.total}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-gym-yellow font-bold text-sm">{coach.sessionsSold} Plans</p>
+                    <p className="text-gym-gray-text text-[9px] uppercase font-black">Sold</p>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="col-span-full py-12 text-center bg-gym-black/20 border border-dashed border-gym-gray-border rounded-xl">
+              <p className="text-gym-gray-text font-bold uppercase tracking-widest text-sm">No Coach Data Available</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

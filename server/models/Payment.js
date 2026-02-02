@@ -9,11 +9,15 @@ const paymentSchema = new mongoose.Schema({
   membershipType: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "MembershipType",
-    required: true
   },
   originalAmount: {
     type: Number,
     required: true
+  },
+  category: {
+    type: String,
+    enum: ["Membership", "PT", "Other"],
+    default: "Membership"
   },
   discount: {
     type: Number,
@@ -26,6 +30,13 @@ const paymentSchema = new mongoose.Schema({
   date: {
     type: Date,
     default: Date.now
+  },
+  coachName:{
+    type: String,
+    trim:true
+  },
+  ptSessions:{
+    type: Number
   },
   invoiceNumber: {
     type: String,
