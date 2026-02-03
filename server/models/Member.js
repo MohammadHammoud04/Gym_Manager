@@ -34,7 +34,8 @@ const memberSchema = new mongoose.Schema(
           required: true
         },
         isFrozen: { type: Boolean, default: false },
-        daysLeftAtFreeze: { type: Number, default: 0 }
+        daysLeftAtFreeze: { type: Number, default: 0 },
+        quantity: { type: Number, default: 1 }
       }
     ],
     info: {

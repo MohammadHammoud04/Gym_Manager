@@ -34,39 +34,61 @@ router.post("/", async (req, res) => {
 
     const createdPayments = [];
 
-    // 1. Process memberships with CATEGORY STACKING
     for (const m of (memberships || [])) {
       const newType = await MembershipType.findById(m.membershipTypeId);
       if (!newType) continue;
 
-      // Populate to see categories of existing memberships
       await member.populate("memberships.membershipType");
 
-      // Find if member already has a membership in this category (e.g., "Gym")
       let existingMembership = member.memberships.find(mem => 
         mem.membershipType && mem.membershipType.category === newType.category
       );
 
       let startDate, endDate;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // --- NEW SYNC LOGIC ---
+      let syncedDate = null;
+      if (m.syncEndDate) {
+        // Look for a membership in a DIFFERENT category that expires soon
+        const otherMembership = member.memberships.find(mem => 
+          mem.membershipType && mem.membershipType.category !== newType.category
+        );
+        
+        if (otherMembership) {
+          const otherEnd = new Date(otherMembership.endDate);
+          const diffDays = Math.ceil((otherEnd - today) / (1000 * 60 * 60 * 24));
+          
+          // If the other membership has < 30 days left, we sync to its end date
+          if (diffDays > 0 && diffDays <= 30) {
+            syncedDate = otherEnd;
+          }
+        }
+      }
+      // --- END SYNC LOGIC ---
 
       if (existingMembership) {
-        // STACKING LOGIC: Start from existing end date if it's in the future
         const currentEnd = new Date(existingMembership.endDate);
         startDate = currentEnd > today ? currentEnd : today;
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + newType.durationInDays);
+        
+        // Use synced date if available, otherwise calculate normally
+        endDate = syncedDate ? new Date(syncedDate) : new Date(startDate);
+        if (!syncedDate) endDate.setDate(endDate.getDate() + newType.durationInDays);
         
         existingMembership.endDate = endDate;
-        existingMembership.membershipType = newType._id; // Update to latest type purchased
+        existingMembership.membershipType = newType._id;
       } else {
-        // NEW CATEGORY: Start from today
         startDate = new Date(today);
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + newType.durationInDays);
+        
+        // Use synced date if available, otherwise calculate normally
+        endDate = syncedDate ? new Date(syncedDate) : new Date(startDate);
+        if (!syncedDate) endDate.setDate(endDate.getDate() + newType.durationInDays);
+        
         member.memberships.push({ membershipType: newType._id, startDate, endDate });
       }
 
-      // Create Payment for this membership
+      // Payment logic remains the same (price is calculated normally)
       const discount = Number(m.discount || 0);
       const p = await Payment.create({
         member: member._id,

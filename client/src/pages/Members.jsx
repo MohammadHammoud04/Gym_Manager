@@ -476,9 +476,18 @@ export default function Members() {
             
             <div className="bg-gym-black/40 border-2 border-gym-gray-border rounded-xl overflow-hidden flex-1 min-h-[180px]">
               <div className="max-h-[180px] overflow-y-auto p-2 space-y-2 custom-scrollbar">
-                {membershipTypes.map((m) => {
-                  const selected = newMember.memberships.find(x => x.membershipTypeId === m._id);
-                  return (
+              {membershipTypes.map((m) => {
+                const selected = newMember.memberships.find(x => x.membershipTypeId === m._id);
+                
+                // Find if the member being edited (if search found one) has a different active category
+                const existingMember = members.find(mem => mem.phone === newMember.phone);
+                const canSync = existingMember?.memberships?.some(em => {
+                  // If selecting Gym, look for Muay Thai (and vice versa)
+                  const isDifferentCategory = em.membershipType?.category !== m.category;
+                  const daysLeft = computeDaysLeft(em.endDate);
+                  return isDifferentCategory && daysLeft > 0 && daysLeft <= 30;
+                });
+                return (
                     <div
                       key={m._id}
                       className={`flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
@@ -511,21 +520,37 @@ export default function Members() {
                       </label>
 
                       {selected && (
-                        <div className="flex items-center gap-2 ml-4">
-                          <span className="text-[9px] uppercase text-gym-gray-text font-black">Discount</span>
-                          <input
-                            type="number"
-                            className="w-16 px-2 py-1 text-xs font-bold rounded-md bg-gym-black border border-gym-gray-border text-white focus:border-gym-yellow outline-none"
-                            value={selected.discount}
-                            onChange={(e) => {
-                              setNewMember({
-                                ...newMember,
-                                memberships: newMember.memberships.map(x =>
-                                  x.membershipTypeId === m._id ? { ...x, discount: Number(e.target.value) } : x
-                                )
-                              })
-                            }}
-                          />
+                        <div className="flex flex-col gap-2 ml-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] uppercase text-gym-gray-text font-black">Discount</span>
+                            <input 
+                              type="number" 
+                              className="..." 
+                              onChange={(e) => {
+                                const updated = newMember.memberships.map(x => 
+                                  x.membershipTypeId === m._id ? { ...x, discount: e.target.value } : x
+                                );
+                                setNewMember({ ...newMember, memberships: updated });
+                              }}
+                            />
+                          </div>
+                          
+                          {canSync && (
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input 
+                                type="checkbox"
+                                className="w-3 h-3 accent-gym-yellow"
+                                checked={!!selected.syncEndDate}
+                                onChange={(e) => {
+                                  const updated = newMember.memberships.map(x => 
+                                    x.membershipTypeId === m._id ? { ...x, syncEndDate: e.target.checked } : x
+                                  );
+                                  setNewMember({ ...newMember, memberships: updated });
+                                }}
+                              />
+                              <span className="text-[9px] font-black uppercase text-gym-yellow">Sync End Date</span>
+                            </label>
+                          )}
                         </div>
                       )}
                     </div>
