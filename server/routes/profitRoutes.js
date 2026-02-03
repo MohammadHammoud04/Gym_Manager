@@ -40,45 +40,64 @@ router.get("/by-coach", async (req, res) => {
 
 //total profit
 router.get("/total", async (req, res) => {
-    try {
-        // 1. Calculate Membership Revenue (from Payments)
-        const paymentResult = await Payment.aggregate([
-            { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
-        const membershipRevenue = paymentResult[0]?.total || 0;
+  try {
+    const now = new Date();
 
-        // 2. Calculate Shop Revenue (from Sales)
-        const saleResult = await Sale.aggregate([
-            { $group: { _id: null, total: { $sum: "$totalPrice" } } }
-        ]);
-        const shopRevenue = saleResult[0]?.total || 0;
+    // Force Local Midnight
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-        // 3. Calculate Total Expenses
-        const expenseResult = await Expense.aggregate([
-            { $group: { _id: null, total: { $sum: "$price" } } }
-        ]);
-        const totalExpenses = expenseResult[0]?.total || 0;
+    const getSum = async (Model, dateField, startDate, sumField) => {
+      const result = await Model.aggregate([
+        { $match: { [dateField]: { $gte: startDate } } },
+        { $group: { _id: null, total: { $sum: `$${sumField}` } } }
+      ]);
+      return result[0]?.total || 0;
+    };
 
-        // 4. Final Calculations
-        const totalRevenue = membershipRevenue + shopRevenue;
-        const netProfit = totalRevenue - totalExpenses;
+    // Use Promise.all to run these faster
+    const [yMem, yShop, yExp, mMem, mShop, mExp, dMem, dShop, dExp] = await Promise.all([
+      getSum(Payment, "date", startOfYear, "amount"),
+      getSum(Sale, "date", startOfYear, "totalPrice"),
+      getSum(Expense, "date", startOfYear, "price"),
+      getSum(Payment, "date", startOfMonth, "amount"),
+      getSum(Sale, "date", startOfMonth, "totalPrice"),
+      getSum(Expense, "date", startOfMonth, "price"),
+      getSum(Payment, "date", startOfToday, "amount"),
+      getSum(Sale, "date", startOfToday, "totalPrice"),
+      getSum(Expense, "date", startOfToday, "price")
+    ]);
 
-        res.json({ 
-            revenue: totalRevenue,       // Memberships + Shop
-            membershipRevenue,            // Breakdown for dashboard
-            shopRevenue,                  // Breakdown for dashboard
-            expenses: totalExpenses,      // Total costs
-            netProfit: netProfit          // Final money left
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    res.json({
+      yearly: {
+        revenue: yMem + yShop,
+        expenses: yExp,
+        netProfit: (yMem + yShop) - yExp
+      },
+      monthly: {
+        revenue: mMem + mShop,
+        expenses: mExp,
+        netProfit: (mMem + mShop) - mExp
+      },
+      daily: {
+        revenue: dMem + dShop,
+        expenses: dExp,
+        netProfit: (dMem + dShop) - dExp
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Profit per class
 router.get("/by-class", async (req, res) => {
   try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const result = await Payment.aggregate([
+      { $match: { date: { $gte: startOfMonth } } },
       {
         $lookup: {
           from: "membershiptypes", 

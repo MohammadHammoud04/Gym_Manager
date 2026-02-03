@@ -19,7 +19,10 @@ export default function Dashboard() {
   const [monthProfit, setMonthProfit] = useState(0)
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [totalExpenses, setTotalExpenses] = useState(0)
-
+  const [monthRevenue, setMonthRevenue] = useState(0);
+  const [monthExpenses, setMonthExpenses] = useState(0);
+  const [todayRevenue, setTodayRevenue] = useState(0);
+  const [todayExpenses, setTodayExpenses] = useState(0);
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [rangeProfit, setRangeProfit] = useState(0)
@@ -33,25 +36,25 @@ export default function Dashboard() {
     }
   }
 
-  const handleSync = async (type) => {
-    setSyncStatus("syncing");
-    setSyncError("");
-    try {
-      const res = await axios.post(`http://localhost:5000/sync/${type}`);
-      if (res.data.success) {
-        setSyncStatus("success");
-        setTimeout(() => setSyncStatus("idle"), 3000);
-      }
-    } catch (err) {
-      setSyncStatus("error");
-      setSyncError(err.response?.data?.error || "Sync failed. Check console.");
-      setTimeout(() => {
-        setSyncStatus("idle");
-        setSyncError("");
-      }, 5000);
-      console.error("Sync Error:", err);
-    }
-  };
+  // const handleSync = async (type) => {
+  //   setSyncStatus("syncing");
+  //   setSyncError("");
+  //   try {
+  //     const res = await axios.post(`http://localhost:5000/sync/${type}`);
+  //     if (res.data.success) {
+  //       setSyncStatus("success");
+  //       setTimeout(() => setSyncStatus("idle"), 3000);
+  //     }
+  //   } catch (err) {
+  //     setSyncStatus("error");
+  //     setSyncError(err.response?.data?.error || "Sync failed. Check console.");
+  //     setTimeout(() => {
+  //       setSyncStatus("idle");
+  //       setSyncError("");
+  //     }, 5000);
+  //     console.error("Sync Error:", err);
+  //   }
+  // };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -59,32 +62,45 @@ export default function Dashboard() {
       try {
         const statusRes = await axios.get("http://localhost:5000/api/db-status");
         setDbMode(statusRes.data.mode);
+  
+        // 1. Fetch Coach Data
         try {
           const coachRes = await axios.get("http://localhost:5000/profit/by-coach");
           setProfitByCoach(coachRes.data);
-        } catch (e) {
-          console.error("Coach data failed, but continuing...", e);
-        }
+        } catch (e) { console.error("Coach data failed", e); }
+  
+        // 2. Set default dates for the Range Calculator
         const now = new Date();
         const offset = now.getTimezoneOffset() * 60000;
         const todayStr = new Date(now - offset).toISOString().split("T")[0];
-        const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const monthStartStr = new Date(firstOfMonth - offset).toISOString().split("T")[0];
-        
         setStartDate(todayStr);
         setEndDate(todayStr);
-
+  
+        // 3. GET ALL TOTALS (Yearly, Monthly, Daily)
         const totalRes = await axios.get("http://localhost:5000/profit/total");
-        setTotalProfit(totalRes.data.netProfit);
-        setTotalExpenses(totalRes.data.expenses);
-        setTotalRevenue(totalRes.data.revenue);
 
+// Explicitly log this to your browser console to see what's happening
+    console.log("BACKEND DATA RECEIVED:", totalRes.data);
+
+    setTotalRevenue(totalRes.data.yearly.revenue);
+    setTotalExpenses(totalRes.data.yearly.expenses);
+    setTotalProfit(totalRes.data.yearly.netProfit);
+
+    setMonthRevenue(totalRes.data.monthly.revenue);
+    setMonthExpenses(totalRes.data.monthly.expenses);
+    setMonthProfit(totalRes.data.monthly.netProfit);
+
+    if (totalRes.data?.daily) {
+      setTodayRevenue(totalRes.data.daily.revenue);
+      setTodayExpenses(totalRes.data.daily.expenses);
+      setTodayProfit(totalRes.data.daily.netProfit);
+    }
+        // 4. Fetch Class Data
         const byClassRes = await axios.get("http://localhost:5000/profit/by-class");
         setProfitByClass(byClassRes.data);
-
-        await fetchRangeProfit(todayStr, todayStr, setTodayProfit);
-        await fetchRangeProfit(monthStartStr, todayStr, setMonthProfit);
-        
+  
+        // --- REMOVED THE TWO fetchRangeProfit CALLS FROM HERE ---
+  
       } catch (err) {
         console.error("Dashboard fetch error:", err);
         setDbMode("Offline");
@@ -123,45 +139,53 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5 mb-8">
-        <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-xl">
-          <p className="text-gym-gray-text text-xs font-semibold mb-1">TOTAL REVENUE</p>
-          <h3 className="text-2xl font-bold text-green-500">${totalRevenue}</h3>
-          <p className="text-gym-gray-text text-[10px]">Gross Sales</p>
-        </div>
+        <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-3 mb-8">
+          {/* YEARLY CARD */}
+          <div className="bg-gym-gray-dark border-2 border-gym-yellow rounded-2xl p-6 shadow-xl">
+            <p className="text-gym-gray-text text-xs font-bold mb-1 uppercase tracking-wider">Yearly Overview (2026)</p>
+            <h3 className="text-3xl font-black text-white">${totalProfit} <span className="text-sm font-normal text-gym-gray-text">Net</span></h3>
+            <div className="flex gap-4 mt-3 pt-3 border-t border-gym-gray-border">
+              <div className="text-green-500 font-bold text-xs uppercase">Revenue: ${totalRevenue}</div>
+              <div className="text-red-500 font-bold text-xs uppercase">Expenses: ${totalExpenses}</div>
+            </div>
+          </div>
 
-        <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-xl border-red-500/20">
-          <p className="text-gym-gray-text text-xs font-semibold mb-1">TOTAL EXPENSES</p>
-          <h3 className="text-2xl font-bold text-red-500">${totalExpenses}</h3>
-          <p className="text-gym-gray-text text-[10px]">Shop Costs</p>
-        </div>
+          {/* MONTHLY CARD */}
+          <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-xl">
+            <p className="text-gym-gray-text text-xs font-bold mb-1 uppercase tracking-wider">Current Month Pulse</p>
+            <h3 className="text-3xl font-black text-white">${monthProfit} <span className="text-sm font-normal text-gym-gray-text">Net</span></h3>
+            <div className="flex gap-4 mt-3 pt-3 border-t border-gym-gray-border">
+              <div className="text-green-500 font-bold text-xs uppercase">Revenue: ${monthRevenue}</div>
+              <div className="text-red-500 font-bold text-xs uppercase">Expenses: ${monthExpenses}</div>
+            </div>
+          </div>
+        
 
-        <div className="bg-gym-gray-dark border-2 border-gym-yellow rounded-2xl p-6 shadow-xl lg:col-span-1">
-          <p className="text-gym-gray-text text-xs font-semibold mb-1">NET PROFIT</p>
-          <h3 className="text-2xl font-bold text-white">${totalProfit}</h3>
-          <p className="text-gym-gray-text text-[10px]">Total Surplus</p>
-        </div>
+          <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-xl hover:border-gym-yellow transition-all">
+            <p className="text-gym-gray-text text-xs font-bold mb-1 uppercase tracking-wider">Today's Activity</p>
+            <h3 className="text-3xl font-black text-white">${todayProfit} <span className="text-sm font-normal text-gym-gray-text">Net</span></h3>
+            <div className="flex gap-4 mt-3 pt-3 border-t border-gym-gray-border">
+              <div className="text-green-500 font-bold text-xs uppercase">Rev: ${todayRevenue}</div>
+              <div className="text-red-500 font-bold text-xs uppercase">Exp: ${todayExpenses}</div>
+            </div>
+          </div>
 
-        <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-xl hover:border-gym-yellow transition-all">
-          <p className="text-gym-gray-text text-xs font-semibold mb-1">TODAY</p>
-          <h3 className="text-2xl font-bold text-white">${todayProfit}</h3>
-          <p className="text-gym-gray-text text-[10px]">Daily Earnings</p>
-        </div>
+      </div>
 
-        <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-xl hover:border-gym-yellow transition-all">
+        {/* <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-xl hover:border-gym-yellow transition-all">
           <p className="text-gym-gray-text text-xs font-semibold mb-1">THIS MONTH</p>
           <h3 className="text-2xl font-bold text-white">${monthProfit}</h3>
           <p className="text-gym-gray-text text-[10px]">Monthly Total</p>
         </div>
-      </div>
+      </div> */}
 
       <div className="grid lg:grid-cols-2 gap-8">
         
         <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
-          <div className="flex items-center gap-2 mb-6">
-            <TrendingUp className="w-6 h-6 text-gym-yellow" />
-            <h2 className="text-2xl font-bold text-white">Profit by Class</h2>
-          </div>
+        <div className="flex items-center gap-2 mb-6">
+          <TrendingUp className="w-6 h-6 text-gym-yellow" />
+          <h2 className="text-2xl font-bold text-white uppercase tracking-tight">Monthly Class Profit</h2>
+        </div>
           <div className="space-y-3">
             {profitByClass.length > 0 ? (
               profitByClass.map((item) => (
