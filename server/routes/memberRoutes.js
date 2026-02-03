@@ -196,6 +196,48 @@ router.post("/:id/renew", async (req, res) => {
   }
 });
 
+//freeze and unfreeze membership
+router.patch("/:id/memberships/:membershipId/freeze", async (req, res) => {
+  try {
+    const member = await Member.findById(req.params.id);
+    if (!member) return res.status(404).json({ error: "Member not found" });
+
+    const membership = member.memberships.id(req.params.membershipId);
+    if (!membership) return res.status(404).json({ error: "Membership not found" });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (!membership.isFrozen) {
+      const end = new Date(membership.endDate);
+      const diffTime = end - today;
+      const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (daysLeft <= 0) {
+        return res.status(400).json({ error: "Cannot freeze an expired membership" });
+      }
+
+      membership.isFrozen = true;
+      membership.daysLeftAtFreeze = daysLeft;
+      // membership.endDate = today;
+    } else {
+      const remainingDays = membership.daysLeftAtFreeze || 0;
+      
+      const newEndDate = new Date(today);
+      newEndDate.setDate(newEndDate.getDate() + remainingDays);
+
+      membership.endDate = newEndDate;
+      membership.isFrozen = false;
+      membership.daysLeftAtFreeze = 0;
+    }
+
+    await member.save();
+    res.json({ message: membership.isFrozen ? "Frozen" : "Unfrozen", member });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.patch("/:id/decrement-pt", async (req, res) => {
   const { coachName } = req.body;
   try {
@@ -203,7 +245,7 @@ router.patch("/:id/decrement-pt", async (req, res) => {
       { 
         member: req.params.id, 
         coachName: coachName,
-        sessionsLeft: { $gt: 0 } // ONLY if sessions are greater than 0
+        sessionsLeft: { $gt: 0 }
       },
       { $inc: { sessionsLeft: -1 } },
       { new: true }

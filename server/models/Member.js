@@ -32,7 +32,9 @@ const memberSchema = new mongoose.Schema(
         endDate: {
           type: Date,
           required: true
-        }
+        },
+        isFrozen: { type: Boolean, default: false },
+        daysLeftAtFreeze: { type: Number, default: 0 }
       }
     ],
     info: {
