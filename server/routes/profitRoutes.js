@@ -7,20 +7,26 @@ const Sale = require("../models/Sale");
 // Profit per PT Coach
 router.get("/by-coach", async (req, res) => {
   try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
     const result = await Payment.aggregate([
-      // 1. Only PT payments
-      { $match: { category: "PT", coachName: { $exists: true, $ne: "" } } },
+      { 
+        $match: { 
+          category: "PT", 
+          coachName: { $exists: true, $ne: "" },
+          date: { $gte: startOfMonth } 
+        } 
+      },
 
-      // 2. Group by coachName
       {
         $group: {
-          _id: "$coachName",                     // Coach name
-          total: { $sum: "$amount" },           // Total money earned
-          sessionsSold: { $sum: "$ptSessions" } // Total sessions sold
+          _id: "$coachName",
+          total: { $sum: "$amount" },
+          sessionsSold: { $sum: "$ptSessions" }
         }
       },
 
-      // 3. Sort by highest total profit
       { $sort: { total: -1 } }
     ]);
 

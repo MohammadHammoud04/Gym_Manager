@@ -6,7 +6,7 @@ import { Coffee, Plus, Receipt, Trash2, Package, Zap } from "lucide-react"
 export default function Sales() {
   const [sales, setSales] = useState([])
   const [inventory, setInventory] = useState([])
-  const [formData, setFormData] = useState({ itemName: "", quantity: 1, pricePerUnit: "" })
+  const [formData, setFormData] = useState({ itemName: "", quantity: 1, pricePerUnit: "", buyerName:"" })
   const [deleteConfirm, setDeleteConfirm] = useState(null)
 
 
@@ -171,6 +171,12 @@ export default function Sales() {
                 onChange={(e) => setFormData({...formData, pricePerUnit: Number(e.target.value)})}
               />
             </div>
+            <input
+                placeholder="Buyer Name (Optional)"
+                className="w-full px-4 py-3 rounded-xl bg-gym-gray border-2 border-gym-gray-border text-white focus:border-gym-yellow outline-none"
+                value={formData.buyerName}
+                onChange={(e) => setFormData({...formData, buyerName: e.target.value})}
+              />
             <button className="w-full bg-gym-yellow text-gym-black font-bold py-3 rounded-xl hover:bg-gym-yellow-bright transition-all">
               Log Sale (+${formData.quantity * formData.pricePerUnit || 0})
             </button>
@@ -187,6 +193,11 @@ export default function Sales() {
               <div key={sale._id} className="flex justify-between items-center p-4 bg-gym-gray rounded-xl border-2 border-gym-gray-border hover:border-gym-yellow/50 transition-all">
                 <div>
                   <p className="text-white font-bold">{sale.itemName} <span className="text-gym-yellow ml-2 text-sm">x{sale.quantity}</span></p>
+                  {sale.buyerName && (
+                    <p className="text-gym-yellow/70 text-[10px] uppercase font-bold">
+                      Buyer: {sale.buyerName}
+                    </p>
+                  )}
                   <p className="text-gym-gray-text text-xs">
                     {new Date(sale.date).toLocaleString([], { 
                       year: 'numeric', 

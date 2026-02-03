@@ -478,15 +478,20 @@ export default function Members() {
               <div className="max-h-[180px] overflow-y-auto p-2 space-y-2 custom-scrollbar">
               {membershipTypes.map((m) => {
                 const selected = newMember.memberships.find(x => x.membershipTypeId === m._id);
-                
+                const isGuest = m.category.toLowerCase() === "guest";
+                const qty = selected?.quantity || 1;
+                const discount = selected?.discount || 0;
+                const liveTotal = (m.price * qty) - discount;
                 // Find if the member being edited (if search found one) has a different active category
                 const existingMember = members.find(mem => mem.phone === newMember.phone);
                 const canSync = existingMember?.memberships?.some(em => {
-                  // If selecting Gym, look for Muay Thai (and vice versa)
-                  const isDifferentCategory = em.membershipType?.category !== m.category;
+                  const existingCategory = em.membershipType?.category;
+                  const isDifferent = existingCategory && existingCategory !== m.category;
+                  
                   const daysLeft = computeDaysLeft(em.endDate);
-                  return isDifferentCategory && daysLeft > 0 && daysLeft <= 30;
+                  return isDifferent && daysLeft > 0 && daysLeft <= 30;
                 });
+
                 return (
                     <div
                       key={m._id}
@@ -534,7 +539,45 @@ export default function Members() {
                               }}
                             />
                           </div>
-                          
+
+                          {isGuest && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] uppercase text-gym-yellow font-black">Days</span>
+                              <input 
+                                type="number" 
+                                min="1"
+                                className="w-16 px-2 py-1 text-xs bg-gym-black border border-gym-yellow/50 rounded text-white outline-none focus:border-gym-yellow"
+                                value={selected.quantity === 0 ? "" : selected.quantity || 1}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const qty = val === "" ? 0 : Number(val);
+                                  const updated = newMember.memberships.map(x => 
+                                    x.membershipTypeId === m._id ? { ...x, quantity: qty } : x
+                                  );
+                                  setNewMember({ ...newMember, memberships: updated });
+                                }}
+                                // When the user clicks away, if it's 0 or empty, snap it back to 1
+                                onBlur={(e) => {
+                                  if (Number(e.target.value) < 1) {
+                                    const updated = newMember.memberships.map(x => 
+                                      x.membershipTypeId === m._id ? { ...x, quantity: 1 } : x
+                                    );
+                                    setNewMember({ ...newMember, memberships: updated });
+                                  }
+                                }}
+                              />
+
+                              <div className="flex items-center justify-between border-t border-gym-yellow/20 pt-2 mt-1">
+                                <span className="text-[10px] text-gym-gray-text uppercase font-bold italic">
+                                  Final Price:
+                                </span>
+                                <span className="text-xs font-black text-gym-yellow">
+                                  ${liveTotal > 0 ? liveTotal : 0}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
                           {canSync && (
                             <label className="flex items-center gap-2 cursor-pointer">
                               <input 
@@ -742,7 +785,7 @@ export default function Members() {
                       statusClasses = "border-blue-500 bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white shadow-[0_0_10px_rgba(59,130,246,0.2)]";
                     } else if (daysLeft <= 0) {
                       statusClasses = "border-gray-500/30 bg-gray-500/5 text-gray-500";
-                    } else if (daysLeft <= 4) {
+                    } else if (daysLeft <= 7) {
                       statusClasses = "border-red-500 bg-red-500/10 text-red-500";
                     } else {
                       statusClasses = "border-gym-yellow bg-gym-yellow/5 text-gym-yellow hover:bg-gym-yellow hover:text-gym-black-dark";

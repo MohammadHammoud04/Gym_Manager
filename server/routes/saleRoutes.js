@@ -15,7 +15,7 @@ router.get("/", async (req, res) => {
 
 // Add a sale
 router.post("/add", async (req, res) => {
-    const { itemName, quantity, pricePerUnit, totalPrice } = req.body;
+    const { itemName, quantity, pricePerUnit, totalPrice, buyerName } = req.body;
 
     try {
         //Create the Sale record (for revenue tracking)
@@ -23,7 +23,8 @@ router.post("/add", async (req, res) => {
             itemName,
             quantity: Number(quantity),
             pricePerUnit: Number(pricePerUnit),
-            totalPrice: Number(totalPrice)
+            totalPrice: Number(totalPrice),
+            buyerName : buyerName || ""
         });
         await newSale.save();
 
@@ -63,7 +64,6 @@ router.delete("/:id", async (req, res) => {
         { $inc: { currentStock: sale.quantity } }
       );
   
-      //Delete the sale record
       await Sale.findByIdAndDelete(req.params.id);
   
       res.json({ message: "Sale deleted and stock returned" });

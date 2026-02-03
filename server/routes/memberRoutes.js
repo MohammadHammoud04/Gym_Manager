@@ -33,75 +33,53 @@ router.post("/", async (req, res) => {
     today.setHours(0, 0, 0, 0);
 
     const createdPayments = [];
-
     for (const m of (memberships || [])) {
       const newType = await MembershipType.findById(m.membershipTypeId);
       if (!newType) continue;
-
-      await member.populate("memberships.membershipType");
-
-      let existingMembership = member.memberships.find(mem => 
-        mem.membershipType && mem.membershipType.category === newType.category
-      );
-
-      let startDate, endDate;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // --- NEW SYNC LOGIC ---
-      let syncedDate = null;
+    
+      const quantity = Math.max(1, Number(m.quantity || 1));
+      // Use toLowerCase to be safe, but we'll stop forcing capitalization on save
+      const isGuest = newType.category.toLowerCase() === "guest";
+      const duration = isGuest ? quantity : newType.durationInDays;
+    
+      let startDate = new Date(today);
+      let endDate = new Date(today);
+      endDate.setDate(endDate.getDate() + duration);
+    
+      // --- SYNCING LOGIC ---
+      // If the user checked sync, find the membership with a DIFFERENT category
       if (m.syncEndDate) {
-        // Look for a membership in a DIFFERENT category that expires soon
-        const otherMembership = member.memberships.find(mem => 
-          mem.membershipType && mem.membershipType.category !== newType.category
-        );
+        const existingToSync = member.memberships.find(em => {
+          // We need to compare the category names, so we ensure they are populated or looked up
+          return em.endDate && em.membershipType.toString() !== newType._id.toString();
+        });
         
-        if (otherMembership) {
-          const otherEnd = new Date(otherMembership.endDate);
-          const diffDays = Math.ceil((otherEnd - today) / (1000 * 60 * 60 * 24));
-          
-          // If the other membership has < 30 days left, we sync to its end date
-          if (diffDays > 0 && diffDays <= 30) {
-            syncedDate = otherEnd;
-          }
+        if (existingToSync) {
+          endDate = new Date(existingToSync.endDate);
         }
       }
-      // --- END SYNC LOGIC ---
-
-      if (existingMembership) {
-        const currentEnd = new Date(existingMembership.endDate);
-        startDate = currentEnd > today ? currentEnd : today;
-        
-        // Use synced date if available, otherwise calculate normally
-        endDate = syncedDate ? new Date(syncedDate) : new Date(startDate);
-        if (!syncedDate) endDate.setDate(endDate.getDate() + newType.durationInDays);
-        
-        existingMembership.endDate = endDate;
-        existingMembership.membershipType = newType._id;
-      } else {
-        startDate = new Date(today);
-        
-        // Use synced date if available, otherwise calculate normally
-        endDate = syncedDate ? new Date(syncedDate) : new Date(startDate);
-        if (!syncedDate) endDate.setDate(endDate.getDate() + newType.durationInDays);
-        
-        member.memberships.push({ membershipType: newType._id, startDate, endDate });
-      }
-
-      // Payment logic remains the same (price is calculated normally)
+    
+      member.memberships.push({
+        membershipType: newType._id,
+        startDate,
+        endDate,
+        quantity: quantity
+      });
+    
+      // Payment Logic
+      const basePrice = newType.price * quantity;
       const discount = Number(m.discount || 0);
-      const p = await Payment.create({
+    
+      await Payment.create({
         member: member._id,
         membershipType: newType._id,
-        originalAmount: newType.price,
+        originalAmount: basePrice,
         discount: discount,
-        amount: newType.price - discount,
+        amount: basePrice - discount,
         date: new Date(),
         category: "Membership"
       });
-      createdPayments.push(p);
     }
-
     await member.save();
 
     // 2. Process PT Logic

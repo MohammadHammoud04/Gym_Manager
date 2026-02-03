@@ -26,12 +26,13 @@ export default function Payments() {
   }, [selectedMember])
 
   const filteredRecent = recentPayments.filter((p) => {
+    const memberPhone= p.member?.phone?.toLowerCase() || ""
     const memberName = p.member?.name?.toLowerCase() || ""
     const coachName = p.coachName?.toLowerCase() || "";
     const membershipName = p.membershipType?.name?.toLowerCase() || ""
     const invoice = p.invoiceNumber?.toLowerCase() || ""
     const q = search.toLowerCase()
-    return memberName.includes(q) || membershipName.includes(q) || coachName.includes(q) || invoice.includes(q)
+    return memberName.includes(q) || membershipName.includes(q) || coachName.includes(q) || invoice.includes(q)  || memberPhone.includes(q)
   })
 
   return (
@@ -48,7 +49,7 @@ export default function Payments() {
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gym-gray-text" />
         <input
           className="w-full pl-12 pr-4 py-3 rounded-xl bg-gym-gray border-2 border-gym-gray-border text-white placeholder:text-gym-gray-text focus:outline-none focus:border-gym-yellow"
-          placeholder="Search by name, membership, or invoice..."
+          placeholder="Search by name, membership, or number..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
