@@ -16,7 +16,7 @@ app.use("/members", require("./routes/memberRoutes.js"));
 app.use("/membership-types", require("./routes/membershipTypeRoutes.js"));
 app.use("/profit", require("./routes/profitRoutes.js"));
 app.use("/payments", require("./routes/paymentRoutes.js"));
-
+app.use("/sync", require("./routes/syncRoutes.js"))
 
 const localURI = "mongodb://127.0.0.1:27017/gym-manager";
 

@@ -1,19 +1,34 @@
 "use client"
 import { useEffect, useState } from "react"
 import axios from "axios"
-import { Coffee, Plus, Receipt, Trash2, Package, Zap } from "lucide-react"
+import { Coffee, Plus, Receipt, Trash2, Package, Zap, DollarSign } from "lucide-react"
 
 export default function Sales() {
   const [sales, setSales] = useState([])
   const [inventory, setInventory] = useState([])
   const [formData, setFormData] = useState({ itemName: "", quantity: 1, pricePerUnit: "", buyerName:"" })
   const [deleteConfirm, setDeleteConfirm] = useState(null)
-
+  const [dailyTotal, setDailyTotal] = useState(0);
+  const [todayRevenue, setTodayRevenue] = useState(0);
 
   const fetchSales = async () => {
-    const res = await axios.get("http://localhost:5000/sales")
-    setSales(res.data)
-  }
+    const res = await axios.get("http://localhost:5000/sales");
+    const salesData = res.data;
+    setSales(salesData);
+
+    const today = new Date();
+    const offset = today.getTimezoneOffset() * 60000;
+    const localToday = new Date(today - offset).toISOString().split("T")[0];
+  
+    const sum = salesData
+      .filter(sale => {
+        const saleDate = new Date(sale.date).toISOString().split("T")[0];
+        return saleDate === localToday;
+      })
+      .reduce((acc, curr) => acc + curr.totalPrice, 0);
+    
+    setDailyTotal(sum);
+  };
 
   const fetchInventory = async () => {
     const res = await axios.get("http://localhost:5000/inventory")
@@ -26,6 +41,8 @@ export default function Sales() {
       await fetchSales();
       await fetchInventory();
       setDeleteConfirm(null); // close modal
+      const profitUpdate = await axios.get("http://localhost:5000/profit/total");
+      setTodayRevenue(profitUpdate.data.daily.revenue);
     } catch (err) {
       console.error("Delete failed:", err);
       alert("Failed to delete sale.");
@@ -41,33 +58,71 @@ export default function Sales() {
         pricePerUnit: item.salePrice,
         totalPrice: item.salePrice
       };
+      
       await axios.post("http://localhost:5000/sales/add", saleData);
-      await fetchInventory();
-      await fetchSales();
+      
+      // Update everything in parallel
+      const [inv, sales, profit] = await Promise.all([
+        axios.get("http://localhost:5000/inventory"),
+        axios.get("http://localhost:5000/sales"),
+        axios.get("http://localhost:5000/profit/total")
+      ]);
+
+      setInventory(inv.data);
+      setSales(sales.data);
+      if (profit.data?.daily) setTodayRevenue(profit.data.daily.revenue);
+
     } catch (err) {
       console.error("Quick sell failed", err);
     }
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    const totalPrice = formData.quantity * formData.pricePerUnit
-    await axios.post("http://localhost:5000/sales/add", { ...formData, totalPrice })
-    setFormData({ itemName: "", quantity: 1, pricePerUnit: "" })
-    fetchSales()
-    fetchInventory()
+    e.preventDefault();
+    try {
+      const totalPrice = formData.quantity * formData.pricePerUnit;
+      await axios.post("http://localhost:5000/sales/add", { ...formData, totalPrice });
+      
+      setFormData({ itemName: "", quantity: 1, pricePerUnit: "", buyerName: "" });
+
+      const [sales, inv, profit] = await Promise.all([
+        axios.get("http://localhost:5000/sales"),
+        axios.get("http://localhost:5000/inventory"),
+        axios.get("http://localhost:5000/profit/total")
+      ]);
+
+      setSales(sales.data);
+      setInventory(inv.data);
+      if (profit.data?.daily) setTodayRevenue(profit.data.daily.revenue);
+      
+    } catch (err) {
+      console.error("Manual sale failed", err);
+    }
   }
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        await Promise.all([fetchSales(), fetchInventory()]);
+        // Fetch both in parallel for speed
+        const [salesRes, profitRes, inventoryRes] = await Promise.all([
+          axios.get("http://localhost:5000/sales"),
+          axios.get("http://localhost:5000/profit/total"),
+          axios.get("http://localhost:5000/inventory")
+        ]);
+  
+        setSales(salesRes.data);
+        setInventory(inventoryRes.data);
+  
+        // Access the daily revenue exactly like the Dashboard does
+        if (profitRes.data?.daily) {
+          setTodayRevenue(profitRes.data.daily.revenue);
+        }
       } catch (err) {
-        console.error(err)
+        console.error("Data fetch error:", err);
       }
-    }
-    fetchData()
-  }, [])
+    };
+    fetchData();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gym-black p-6 lg:p-8">
@@ -101,10 +156,39 @@ export default function Sales() {
         </div>
       )}
 
-      <div className="flex items-center gap-3 mb-8">
-        <Coffee className="w-8 h-8 text-gym-yellow" />
-        <h1 className="text-4xl font-bold text-white">Shop & Inventory</h1>
-      </div>
+        <div className="flex flex-col lg:flex-row justify-between items-start gap-6 mb-8">
+          {/* Left: Title */}
+          <div className="flex items-center gap-3">
+            <Coffee className="w-10 h-10 text-gym-yellow" />
+            <h1 className="text-4xl font-bold text-white tracking-tight">Shop & Inventory</h1>
+          </div>
+
+          {/* Right: Stats Cards (Matching Dashboard Style) */}
+          <div className="flex flex-wrap gap-4 w-full lg:w-auto">
+            
+            {/* Today's Transactions (Calculated locally from sales list) */}
+            <div className="flex-1 lg:flex-none bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-4 min-w-[160px] flex items-center justify-between shadow-xl">
+              <div>
+                <p className="text-gym-gray-text text-[10px] font-bold uppercase tracking-widest">Transactions</p>
+                <h3 className="text-2xl font-black text-white">
+                  {sales.filter(s => new Date(s.date).toDateString() === new Date().toDateString()).length}
+                </h3>
+              </div>
+              <Receipt className="w-6 h-6 text-gym-gray-text opacity-30" />
+            </div>
+
+            {/* Today's Total Revenue (From /profit/total route) */}
+            <div className="flex-1 lg:flex-none bg-gym-gray-dark border-2 border-gym-yellow rounded-2xl p-4 min-w-[200px] flex items-center justify-between shadow-xl">
+              <div>
+                <p className="text-gym-yellow text-[10px] font-bold uppercase tracking-widest">Today's Revenue</p>
+                <h3 className="text-3xl font-black text-white">${todayRevenue}</h3>
+              </div>
+              <div className="bg-gym-yellow/10 p-2 rounded-lg">
+                <DollarSign className="w-7 h-7 text-gym-yellow" />
+              </div>
+            </div>
+          </div>
+        </div>
 
       {/* Quick Sell Inventory Section */}
       <div className="mb-10">

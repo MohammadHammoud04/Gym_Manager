@@ -26,6 +26,9 @@ export default function Dashboard() {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [rangeProfit, setRangeProfit] = useState(0)
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncConfirm, setSyncConfirm] = useState(null); // Controls the modal
+  const [pendingFile, setPendingFile] = useState(null);
 
   const fetchRangeProfit = async (start, end, setter) => {
     try {
@@ -117,9 +120,113 @@ export default function Dashboard() {
     await fetchRangeProfit(startDate, endDate, setRangeProfit)
   }
 
+  const handleExport = async () => {
+      try {
+          const res = await axios.get("http://localhost:5000/sync/export");
+          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(res.data));
+          const downloadAnchorNode = document.createElement('a');
+          downloadAnchorNode.setAttribute("href", dataStr);
+          downloadAnchorNode.setAttribute("download", `GYM_DATA_${new Date().toISOString().split('T')[0]}.json`);
+          document.body.appendChild(downloadAnchorNode);
+          downloadAnchorNode.click();
+          downloadAnchorNode.remove();
+      } catch (err) {
+          alert("Export failed. Check server connection.");
+      }
+  };
+
+  const handleFileSelection = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+  
+    setPendingFile(file);
+    setSyncConfirm({
+      title: "Database Overwrite",
+      message: "This will permanently delete all local members, payments, and sales and replace them with the data from this file.",
+      type: "danger" // Using danger for the red/yellow warning style
+    });
+    
+    // Reset the input so you can select the same file twice if needed
+    event.target.value = ''; 
+  };
+  
+  // Triggered when user clicks "Confirm" in the modal
+  const executeImport = async () => {
+    if (!pendingFile) return;
+  
+    setIsSyncing(true);
+    const reader = new FileReader();
+  
+    reader.onload = async (e) => {
+      try {
+        const content = JSON.parse(e.target.result);
+        await axios.post("http://localhost:5000/sync/import", content);
+        
+        // Success state change
+        setSyncConfirm({
+          title: "Success!",
+          message: "The database has been updated. The page will now reload.",
+          type: "success"
+        });
+        
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+  
+      } catch (err) {
+        alert("Import failed! Ensure the file is a valid backup.");
+        setSyncConfirm(null);
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+    reader.readAsText(pendingFile);
+  };
+
   return (
     <div className="min-h-screen bg-gym-black p-6 lg:p-8">
-      
+
+      {syncConfirm && (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] animate-in fade-in zoom-in duration-200">
+        <div className="bg-gym-gray-dark border-2 border-gym-yellow rounded-2xl p-6 max-w-xs w-full mx-4 shadow-2xl text-center">
+          <div className="mb-4 flex justify-center">
+            <div className={`p-3 rounded-full ${syncConfirm.type === 'success' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+              <AlertCircle size={32} />
+            </div>
+          </div>
+          
+          <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">
+            {syncConfirm.title}
+          </h3>
+          <p className="text-gym-gray-text text-sm mb-6">
+            {syncConfirm.message}
+          </p>
+    
+          <div className="flex flex-col gap-2">
+            {syncConfirm.type !== 'success' && (
+              <>
+                <button
+                  disabled={isSyncing}
+                  onClick={executeImport}
+                  className="w-full py-3 rounded-xl font-black uppercase tracking-widest transition-all bg-red-600 hover:bg-red-500 text-white disabled:opacity-50"
+                >
+                  {isSyncing ? "Injecting Data..." : "Confirm Overwrite"}
+                </button>
+                
+                <button
+                  disabled={isSyncing}
+                  onClick={() => { setSyncConfirm(null); setPendingFile(null); }}
+                  className="w-full py-3 rounded-xl bg-gym-gray text-white font-bold hover:bg-gym-gray-border"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6 bg-gym-gray-dark p-6 rounded-2xl border-2 border-gym-gray-border shadow-2xl">
         <div>
           <div className="flex items-center gap-3 mb-2">
@@ -269,6 +376,79 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-    </div>
+      <div className="mt-12 p-8 bg-gym-gray-dark border-2 border-dashed border-gym-gray-border rounded-3xl">
+      <div className="flex items-center gap-4 mb-6">
+          <Database className="w-8 h-8 text-gym-yellow" />
+          <div>
+              <h2 className="text-2xl font-bold text-white uppercase tracking-tighter">Cross-Device Sync</h2>
+              <p className="text-gym-gray-text text-sm font-medium">Transfer your local database to another laptop.</p>
+          </div>
+      </div>
+
+      <div className="flex flex-wrap gap-4">
+          <button 
+              onClick={handleExport}
+              className="flex items-center gap-2 bg-white text-black hover:bg-gym-yellow transition-colors px-6 py-3 rounded-xl font-black uppercase text-sm"
+          >
+              <CloudUpload size={18} /> 1. Export Data to File
+          </button>
+
+          <label className="flex items-center gap-2 bg-gym-gray border border-gym-gray-border hover:border-gym-yellow text-white cursor-pointer px-6 py-3 rounded-xl font-black uppercase text-sm transition-all">
+            <RefreshCw size={18} /> 
+            Import & Overwrite
+            <input 
+              type="file" 
+              className="hidden" 
+              onChange={handleFileSelection} 
+              accept=".json" 
+            />
+        </label>
+      </div>
+      
+      <p className="mt-4 text-[10px] text-gym-gray-text uppercase font-bold tracking-widest opacity-50">
+          Note: Local user accounts are not affected by this sync.
+      </p>
+  </div>
+  {syncConfirm && (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] animate-in fade-in zoom-in duration-200">
+        <div className="bg-gym-gray-dark border-2 border-gym-yellow rounded-2xl p-6 max-w-xs w-full mx-4 shadow-2xl text-center">
+          <div className="mb-4 flex justify-center">
+            <div className={`p-3 rounded-full ${syncConfirm.type === 'success' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+              {syncConfirm.type === 'success' ? <CheckCircle size={32} /> : <AlertCircle size={32} />}
+            </div>
+          </div>
+          
+          <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">
+            {syncConfirm.title}
+          </h3>
+          <p className="text-gym-gray-text text-sm mb-6">
+            {syncConfirm.message}
+          </p>
+
+          <div className="flex flex-col gap-2">
+            {syncConfirm.type !== 'success' && (
+              <>
+                <button
+                  disabled={isSyncing}
+                  onClick={executeImport}
+                  className="w-full py-3 rounded-xl font-black uppercase tracking-widest transition-all bg-red-600 hover:bg-red-500 text-white disabled:opacity-50"
+                >
+                  {isSyncing ? "Injecting Data..." : "Confirm Overwrite"}
+                </button>
+                
+                <button
+                  disabled={isSyncing}
+                  onClick={() => { setSyncConfirm(null); setPendingFile(null); }}
+                  className="w-full py-3 rounded-xl bg-gym-gray text-white font-bold hover:bg-gym-gray-border"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+</div>
   )
 }
