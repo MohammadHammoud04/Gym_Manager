@@ -23,7 +23,8 @@ const ptSessionSchema = new mongoose.Schema({
     type: String, 
     enum: ["Member", "Daily Access"],
     default: "Member"
-  }
+  },
+  balance: { type: Number, default: 0 },
 }, { timestamps: true });
 
 // Ensure a member can't have two separate records for the same coach

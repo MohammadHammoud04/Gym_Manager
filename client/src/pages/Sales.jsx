@@ -9,7 +9,7 @@ export default function Sales() {
   const [formData, setFormData] = useState({ itemName: "", quantity: 1, pricePerUnit: "", buyerName:"" })
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [dailyTotal, setDailyTotal] = useState(0);
-  const [todayRevenue, setTodayRevenue] = useState(0);
+  const [todayProfit, setTodayProfit] = useState(0);
 
   const fetchSales = async () => {
     const res = await axios.get("http://localhost:5000/sales");
@@ -36,13 +36,15 @@ export default function Sales() {
   }
 
   const handleDelete = async (id) => {
+    const currentUser = localStorage.getItem("gymUser")
     try {
-      await axios.delete(`http://localhost:5000/sales/${id}`);
+      await axios.delete(`http://localhost:5000/sales/${id}`, {data: { userName: currentUser}});
       await fetchSales();
       await fetchInventory();
       setDeleteConfirm(null); // close modal
       const profitUpdate = await axios.get("http://localhost:5000/profit/total");
-      setTodayRevenue(profitUpdate.data.daily.revenue);
+      setTodayProfit(profitUpdate.data.daily.netProfit);
+      refreshPageData();
     } catch (err) {
       console.error("Delete failed:", err);
       alert("Failed to delete sale.");
@@ -50,18 +52,19 @@ export default function Sales() {
   };
   
   const handleQuickSell = async (item) => {
+    const currentUser = localStorage.getItem("gymUser");    
     if (item.currentStock <= 0) return alert("Out of stock!");
-    try {
+      try {
       const saleData = {
         itemName: item.name,
         quantity: 1,
         pricePerUnit: item.salePrice,
-        totalPrice: item.salePrice
+        totalPrice: item.salePrice,
+        userName: currentUser
       };
-      
+
       await axios.post("http://localhost:5000/sales/add", saleData);
       
-      // Update everything in parallel
       const [inv, sales, profit] = await Promise.all([
         axios.get("http://localhost:5000/inventory"),
         axios.get("http://localhost:5000/sales"),
@@ -70,18 +73,38 @@ export default function Sales() {
 
       setInventory(inv.data);
       setSales(sales.data);
-      if (profit.data?.daily) setTodayRevenue(profit.data.daily.revenue);
-
+      setTodayProfit(profit.data.daily.netProfit);
+      refreshPageData();
     } catch (err) {
       console.error("Quick sell failed", err);
     }
   }
 
+  const refreshPageData = async () => {
+    try {
+      const [salesRes, profitRes, inventoryRes] = await Promise.all([
+        axios.get("http://localhost:5000/sales"),
+        axios.get("http://localhost:5000/profit/total"),
+        axios.get("http://localhost:5000/inventory")
+      ]);
+
+      setSales(salesRes.data);
+      setInventory(inventoryRes.data);
+
+      if (profitRes.data?.daily) {
+        setTodayProfit(profitRes.data.daily.netProfit);
+      }
+    } catch (err) {
+      console.error("Refresh error:", err);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const currentUser = localStorage.getItem("gymUser")
     try {
       const totalPrice = formData.quantity * formData.pricePerUnit;
-      await axios.post("http://localhost:5000/sales/add", { ...formData, totalPrice });
+      await axios.post("http://localhost:5000/sales/add", { ...formData, totalPrice, userName:currentUser });
       
       setFormData({ itemName: "", quantity: 1, pricePerUnit: "", buyerName: "" });
 
@@ -93,17 +116,17 @@ export default function Sales() {
 
       setSales(sales.data);
       setInventory(inv.data);
-      if (profit.data?.daily) setTodayRevenue(profit.data.daily.revenue);
-      
+      setTodayProfit(profit.data.daily.netProfit);   
+      refreshPageData();   
     } catch (err) {
       console.error("Manual sale failed", err);
     }
   }
 
   useEffect(() => {
+    refreshPageData();
     const fetchData = async () => {
       try {
-        // Fetch both in parallel for speed
         const [salesRes, profitRes, inventoryRes] = await Promise.all([
           axios.get("http://localhost:5000/sales"),
           axios.get("http://localhost:5000/profit/total"),
@@ -113,9 +136,8 @@ export default function Sales() {
         setSales(salesRes.data);
         setInventory(inventoryRes.data);
   
-        // Access the daily revenue exactly like the Dashboard does
         if (profitRes.data?.daily) {
-          setTodayRevenue(profitRes.data.daily.revenue);
+         setTodayProfit(profitRes.data.daily.netProfit);
         }
       } catch (err) {
         console.error("Data fetch error:", err);
@@ -181,7 +203,7 @@ export default function Sales() {
             <div className="flex-1 lg:flex-none bg-gym-gray-dark border-2 border-gym-yellow rounded-2xl p-4 min-w-[200px] flex items-center justify-between shadow-xl">
               <div>
                 <p className="text-gym-yellow text-[10px] font-bold uppercase tracking-widest">Today's Revenue</p>
-                <h3 className="text-3xl font-black text-white">${todayRevenue}</h3>
+                <h3 className="text-3xl font-black text-white">${todayProfit}</h3>
               </div>
               <div className="bg-gym-yellow/10 p-2 rounded-lg">
                 <DollarSign className="w-7 h-7 text-gym-yellow" />

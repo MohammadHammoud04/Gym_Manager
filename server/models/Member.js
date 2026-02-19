@@ -35,14 +35,19 @@ const memberSchema = new mongoose.Schema(
         },
         isFrozen: { type: Boolean, default: false },
         daysLeftAtFreeze: { type: Number, default: 0 },
-        quantity: { type: Number, default: 1 }
+        quantity: { type: Number, default: 1 },
+        balance: { type: Number, default: 0 }
       }
     ],
+    balance: {
+       type: Number, default: 0 
+      },
     info: {
       bloodType: { type: String, default: "" },
       address: { type: String, default: "" },
       reference: { type: String, default: "" },
-      injury: { type: String, default: "" }
+      injury: { type: String, default: "" },
+      note: {type : String, default: "" }
     }
   },
   { timestamps: true }

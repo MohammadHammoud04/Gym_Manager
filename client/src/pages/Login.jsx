@@ -16,6 +16,7 @@ export default function Login({ onLogin }) {
       const res = await axios.post("http://localhost:5000/login", { name, password })
       localStorage.setItem("token", res.data.token)
       localStorage.setItem("role", res.data.role)
+      localStorage.setItem("gymUser", res.data.name)
       onLogin(res.data.role)
     } catch (err) {
       setError(err.response?.data.message || "Login Failed")

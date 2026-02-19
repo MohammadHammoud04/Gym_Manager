@@ -3,154 +3,278 @@ const router = express.Router();
 const Member = require("../models/Member");
 const MembershipType = require("../models/MembershipType");
 const Payment = require("../models/Payment");
-const PTSession = require("../models/PTSession"); // Import the new model
+const PTSession = require("../models/PTSession"); 
+const Log = require("../models/Log2");
 
 // create or extend member
 router.post("/", async (req, res) => {
   try {
-    let { name, phone, memberships, ptDetails } = req.body;
+    let { name, phone, memberships = [], ptDetails, totalAmount = 0, paidAmount = 0 } = req.body;
 
-    if (!name || !phone) {
-      return res.status(400).json({ error: "Name and phone are required" });
-    }
+    if (!name || !phone) return res.status(400).json({ error: "Name and phone are required" });
 
-    const nameTrimmed = name.trim();
+    const nameNormalized = name.trim().toLowerCase();
     const phoneTrimmed = phone.trim();
-    const nameNormalized = nameTrimmed.toLowerCase();
 
-    // Find or create member
-    let member = await Member.findOne({ nameNormalized, phone: phoneTrimmed });
+    let member = await Member.findOne({ nameNormalized, phone: phoneTrimmed }).populate("memberships.membershipType");
+    
     if (!member) {
       member = new Member({
-        name: nameTrimmed,
+        name: name.trim(),
         phone: phoneTrimmed,
         nameNormalized,
-        memberships: []
+        memberships: [],
+        balance: 0
       });
     }
 
+    let remainingCash = Number(paidAmount);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     const createdPayments = [];
-    for (const m of (memberships || [])) {
+
+//process payments
+    for (const m of memberships) {
       const newType = await MembershipType.findById(m.membershipTypeId);
       if (!newType) continue;
-    
+
+//guest logic
       const quantity = Math.max(1, Number(m.quantity || 1));
-      // Use toLowerCase to be safe, but we'll stop forcing capitalization on save
-      const isGuest = newType.category.toLowerCase() === "guest";
-      const duration = isGuest ? quantity : newType.durationInDays;
-    
-      let startDate = new Date(today);
-      let endDate = new Date(today);
-      endDate.setDate(endDate.getDate() + duration);
-    
-      // --- SYNCING LOGIC ---
-      // If the user checked sync, find the membership with a DIFFERENT category
-      if (m.syncEndDate) {
-        const existingToSync = member.memberships.find(em => {
-          // We need to compare the category names, so we ensure they are populated or looked up
-          return em.endDate && em.membershipType.toString() !== newType._id.toString();
+      const isGuest = newType.category?.toLowerCase() === "guest";
+      const duration = isGuest ? quantity : (newType.durationInDays || 0);
+
+//cal cost and split payments
+      const costOfThis = (newType.price * quantity);
+      const payForThis = Math.min(remainingCash, costOfThis);
+      const debtForThis = costOfThis - payForThis;
+
+      const existing = member.memberships.find(mem => 
+        mem.membershipType && (
+          mem.membershipType._id?.toString() === newType._id.toString() ||
+          mem.membershipType.category === newType.category
+        ) && !mem.isFrozen
+      );
+
+      if (existing) {
+        const baseStart = new Date(existing.endDate) > today ? new Date(existing.endDate) : today;
+        const newEnd = new Date(baseStart);
+        newEnd.setDate(newEnd.getDate() + duration);
+        existing.endDate = newEnd;
+        existing.membershipType = newType._id;
+        existing.balance = (existing.balance || 0) + debtForThis; // Specific debt
+      } else {
+        let endDate = new Date(today);
+        endDate.setDate(endDate.getDate() + duration);
+        member.memberships.push({
+          membershipType: newType._id,
+          startDate: today,
+          endDate: endDate,
+          quantity: quantity,
+          balance: debtForThis // Specific debt
         });
-        
-        if (existingToSync) {
-          endDate = new Date(existingToSync.endDate);
-        }
       }
-    
-      member.memberships.push({
-        membershipType: newType._id,
-        startDate,
-        endDate,
-        quantity: quantity
-      });
-    
-      // Payment Logic
-      const basePrice = newType.price * quantity;
-      const discount = Number(m.discount || 0);
-    
-      await Payment.create({
-        member: member._id,
-        membershipType: newType._id,
-        originalAmount: basePrice,
-        discount: discount,
-        amount: basePrice - discount,
-        date: new Date(),
-        category: "Membership"
-      });
+
+//log payments for each class
+      if (payForThis > 0) {
+        createdPayments.push(await Payment.create({
+          member: member._id,
+          membershipType: newType._id,
+          amount: payForThis,
+          originalAmount: costOfThis,
+          category: "Membership",
+          date: new Date()
+        }));
+      }
+      remainingCash -= payForThis;
     }
+
+    // process pt
+    if (ptDetails && ptDetails.coachName?.trim()) {
+      const ptPrice = Number(ptDetails.price || 0) * Number(ptDetails.sessions || 0);
+      const payForPT = Math.min(remainingCash, ptPrice);
+      const ptDebt = ptPrice - payForPT;
+    
+      await PTSession.findOneAndUpdate(
+        { member: member._id, coachName: ptDetails.coachName.trim() },
+        { 
+            $inc: { 
+              sessionsLeft: Number(ptDetails.sessions),
+              balance: ptDebt // This separates debt by coach
+            },
+            $set: { type: ptDetails.type, pricePerSession: Number(ptDetails.price || 0) }
+        },
+        { upsert: true }
+      );
+    
+      if (payForPT > 0) {
+        createdPayments.push(await Payment.create({
+          member: member._id,
+          amount: payForPT,
+          originalAmount: ptPrice,
+          category: "PT",
+          coachName: ptDetails.coachName.trim(),
+          ptSessions: Number(ptDetails.sessions),
+          date: new Date()
+        }));
+      }
+      remainingCash -= payForPT; 
+    }
+    
+    const transactionDebt = Number(totalAmount) - Number(paidAmount);
+    member.balance = (member.balance || 0) + transactionDebt; 
+    
     await member.save();
 
-    // 2. Process PT Logic
-    if (ptDetails && ptDetails.coachName && ptDetails.coachName.trim() !== "") {
-      const numSessions = Number(ptDetails.sessions || 0);
-      const sessionPrice = Number(ptDetails.price || 0);
-
-      if (numSessions > 0) {
-        await PTSession.findOneAndUpdate(
-          { member: member._id, coachName: ptDetails.coachName.trim() },
-          { 
-            $inc: { sessionsLeft: numSessions },
-            $set: { type: ptDetails.type, pricePerSession: sessionPrice }
-          },
-          { upsert: true }
-        );
-
-        const ptPay = await Payment.create({
-          member: member._id,
-          originalAmount: numSessions * sessionPrice,
-          discount: 0,
-          amount: numSessions * sessionPrice,
-          date: new Date(),
-          coachName: ptDetails.coachName.trim(),
-          ptSessions: numSessions,
-          category: "PT" 
-        });
-        createdPayments.push(ptPay);
-      }
-    }
+    await Log.create({
+      actionType: 'ADDITION',
+      module: 'MEMBER',
+      details: `Added/Renewed member: ${member.name}`,
+      amount: Number(paidAmount),
+      userName: req.body.userName
+    });
 
     res.status(201).json({ member, payments: createdPayments });
   } catch (err) {
+    console.error("SERVER ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// renew membership
+//update info
+router.put("/:id", async (req, res) => {
+  try {
+    const { info, userName } = req.body;
+    
+    // Find member and update only the info field
+    const member = await Member.findByIdAndUpdate(
+      req.params.id,
+      { $set: { info: info } },
+      { new: true } 
+    );
+
+    if (!member) return res.status(404).json({ error: "Member not found" });
+
+    await Log.create({
+      actionType: 'UPDATE',
+      module: 'MEMBER',
+      details: `Updated info for ${member.name}`,
+      userName: userName || "System"
+    });
+
+    res.json(member);
+  } catch (err) {
+    console.error("Update Info Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+//pay-balance route
+router.patch("/:id/pay-balance", async (req, res) => {
+  try {
+    const { amountPaid, membershipTypeId, coachName, userName } = req.body;
+    const member = await Member.findById(req.params.id);
+    if (!member) return res.status(404).json({ error: "Member not found" });
+
+    const currentTotalBalance = member.balance || 0;
+    const paymentAmount = Number(amountPaid || 0);
+    
+    member.balance = Math.max(0, currentTotalBalance - paymentAmount);
+
+    let paymentCategory = "Other";
+
+    if (coachName) {
+      paymentCategory = "PT";
+      const session = await PTSession.findOneAndUpdate(
+        { member: req.params.id, coachName: coachName },
+        { $inc: { balance: -paymentAmount } },
+        { new: true }
+      );
+      
+      if (session && session.balance < 0) {
+        session.balance = 0;
+        await session.save();
+      }
+    } else if (membershipTypeId) {
+      const membershipEntry = member.memberships.id(membershipTypeId);
+      
+      if (membershipEntry) {
+        const mType = await MembershipType.findById(membershipEntry.membershipType);
+        
+        paymentCategory = mType ? mType.category : "Membership";
+
+        const currentMembershipBalance = membershipEntry.balance || 0;
+        membershipEntry.balance = Math.max(0, currentMembershipBalance - paymentAmount)
+      }
+    }
+
+    // Create the Payment Record
+    await Payment.create({
+      member: member._id,
+      membershipType: membershipTypeId,
+      amount: paymentAmount,
+      originalAmount: currentTotalBalance, 
+      category: paymentCategory, 
+      coachName: coachName || null, 
+      date: new Date()
+    });
+
+    await member.save();
+
+    // Create the Log
+    await Log.create({
+      actionType: 'PAYMENT',
+      module: 'MEMBER',
+      details: `${member.name} paid ${paymentAmount} towards ${paymentCategory}`,
+      amount: Number(paymentAmount),
+      userName: userName || "System"
+    });
+
+    res.json(member);
+  } catch (err) {
+    console.error("PAYMENT ROUTE ERROR:", err); // THIS WILL SHOW IN YOUR TERMINAL
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post("/:id/renew", async (req, res) => {
   const { membershipTypeId, ptDetails } = req.body;
 
   try {
-    const member = await Member.findById(req.params.id);
+    const member = await Member.findById(req.params.id).populate("memberships.membershipType");
     if (!member) return res.status(404).json({ error: "Member not found" });
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const createdPayments = [];
 
-    // 1. Membership Renewal with CATEGORY STACKING
     if (membershipTypeId) {
       const newType = await MembershipType.findById(membershipTypeId);
       if (newType) {
-        await member.populate("memberships.membershipType");
-
-        let existing = member.memberships.find(mem => 
-          mem.membershipType && mem.membershipType.category === newType.category
+        const existing = member.memberships.find(mem =>
+          mem.membershipType?.category === newType.category
         );
 
         if (existing) {
-          const currentEnd = new Date(existing.endDate);
-          const startDate = currentEnd > today ? currentEnd : today;
-          const endDate = new Date(startDate);
-          endDate.setDate(endDate.getDate() + newType.durationInDays);
-          existing.endDate = endDate;
+          const baseStart =
+            new Date(existing.endDate) > today
+              ? new Date(existing.endDate)
+              : today;
+
+          const newEnd = new Date(baseStart);
+          newEnd.setDate(newEnd.getDate() + newType.durationInDays);
+
+          existing.endDate = newEnd;
           existing.membershipType = newType._id;
         } else {
-          const startDate = new Date(today);
-          const endDate = new Date(startDate);
+          const endDate = new Date(today);
           endDate.setDate(endDate.getDate() + newType.durationInDays);
-          member.memberships.push({ membershipType: newType._id, startDate, endDate });
+
+          member.memberships.push({
+            membershipType: newType._id,
+            startDate: today,
+            endDate
+          });
         }
 
         const p = await Payment.create({
@@ -162,14 +286,16 @@ router.post("/:id/renew", async (req, res) => {
           date: new Date(),
           category: "Membership"
         });
+
         createdPayments.push(p);
       }
     }
 
-    // 2. PT Renewal
-    if (ptDetails && ptDetails.coachName) {
+    // PT RENEW
+    if (ptDetails?.coachName) {
       const num = Number(ptDetails.sessions);
       const price = Number(ptDetails.price);
+
       await PTSession.findOneAndUpdate(
         { member: member._id, coachName: ptDetails.coachName.trim() },
         { $inc: { sessionsLeft: num }, $set: { pricePerSession: price } },
@@ -186,6 +312,7 @@ router.post("/:id/renew", async (req, res) => {
         coachName: ptDetails.coachName.trim(),
         ptSessions: num
       });
+
       createdPayments.push(ptPay);
     }
 
@@ -196,147 +323,156 @@ router.post("/:id/renew", async (req, res) => {
   }
 });
 
-//freeze and unfreeze membership
+router.patch("/:id/memberships/:membershipId/dates", async (req, res) => {
+  try {
+    const { startDate, endDate, userName } = req.body;
+    const member = await Member.findById(req.params.id);
+    
+    if (!member) return res.status(404).json({ error: "Member not found" });
+
+    const membership = member.memberships.id(req.params.membershipId);
+    if (!membership) return res.status(404).json({ error: "Membership not found" });
+
+    // Update the dates
+    if (startDate) membership.startDate = new Date(startDate);
+    if (endDate) membership.endDate = new Date(endDate);
+
+    membership.isFrozen = false;
+    membership.daysLeftAtFreeze = 0;
+
+    await Log.create({
+      actionType: 'UPDATE',
+      module: 'MEMBER',
+      details: `Changed dates for ${member.name}: ${startDate} to ${endDate}`,
+      userName: userName
+    });
+
+    await member.save();
+    res.json({ member });
+  } catch (err) {
+    console.error("Update Dates Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete("/:id", async (req, res) => {
+  try {
+    const memberId = req.params.id;
+    const { userName } = req.body;
+    const member = await Member.findById(memberId);
+    
+    if (!member) {
+      return res.status(404).json({ error: "Member not found" });
+    }
+
+    if (member) {
+      await Log.create({
+        actionType: 'DELETION',
+        module: 'MEMBER',
+        details: `Deleted member: ${member.name}`,
+        userName: userName || "System Admin", 
+      });
+    }
+    
+    await Payment.deleteMany({ member: memberId });
+    await PTSession.deleteMany({ member: memberId });
+
+    await Member.findByIdAndDelete(memberId);
+
+    res.json({ message: "Member and associated data deleted successfully" });
+  } catch (err) {
+    console.error("Delete Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.patch("/:id/memberships/:membershipId/freeze", async (req, res) => {
   try {
+    const { userName } = req.body;
     const member = await Member.findById(req.params.id);
     if (!member) return res.status(404).json({ error: "Member not found" });
 
     const membership = member.memberships.id(req.params.membershipId);
     if (!membership) return res.status(404).json({ error: "Membership not found" });
 
+    const action = membership.isFrozen ? "UNFROZEN" : "FROZEN";
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     if (!membership.isFrozen) {
-      const end = new Date(membership.endDate);
-      const diffTime = end - today;
-      const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
+      const diff = membership.endDate - today;
+      const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
       if (daysLeft <= 0) {
-        return res.status(400).json({ error: "Cannot freeze an expired membership" });
+        return res.status(400).json({ error: "Cannot freeze expired membership" });
       }
-
       membership.isFrozen = true;
       membership.daysLeftAtFreeze = daysLeft;
-      // membership.endDate = today;
     } else {
-      const remainingDays = membership.daysLeftAtFreeze || 0;
-      
-      const newEndDate = new Date(today);
-      newEndDate.setDate(newEndDate.getDate() + remainingDays);
-
-      membership.endDate = newEndDate;
+      const newEnd = new Date(today);
+      newEnd.setDate(newEnd.getDate() + membership.daysLeftAtFreeze);
+      membership.endDate = newEnd;
       membership.isFrozen = false;
       membership.daysLeftAtFreeze = 0;
     }
 
+    await Log.create({
+      actionType: 'UPDATE',
+      module: 'MEMBER',
+      details: `${action} membership for ${member.name}`,
+      userName: userName
+    });
+
     await member.save();
-    res.json({ message: membership.isFrozen ? "Frozen" : "Unfrozen", member });
+    res.json({ member });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 router.patch("/:id/decrement-pt", async (req, res) => {
-  const { coachName } = req.body;
+  const { coachName, userName } = req.body;
   try {
+    const member = await Member.findById(req.params.id);
     const session = await PTSession.findOneAndUpdate(
-      { 
-        member: req.params.id, 
-        coachName: coachName,
-        sessionsLeft: { $gt: 0 }
-      },
+      { member: req.params.id, coachName, sessionsLeft: { $gt: 0 } },
       { $inc: { sessionsLeft: -1 } },
       { new: true }
     );
 
     if (!session) {
-      return res.status(400).json({ error: "No sessions remaining or session not found" });
+      return res.status(400).json({ error: "No sessions remaining" });
     }
-    
+
+    await Log.create({
+      actionType: 'UPDATE', // Consistent with your info update logs
+      module: 'MEMBER',
+      details: `PT Session decremented for ${member.name} (Coach: ${coachName}). Sessions left: ${session.sessionsLeft}`,
+      userName: userName || "System"
+    });
+
     res.json(session);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-//get all payments for a member
-router.get("/:id/payments", async(req,res)=>{
-    try{
-        const payments = await Payment.find({member: req.params.id})
-        .populate("membershipType","name price category audience")
-        .sort({date: -1}); //newest first
-
-        res.json(payments);
-    }
-    catch(err){
-        return res.status(500).json({error: err.message});
-    }
-});
-
-// GET all members
 router.get("/", async (req, res) => {
-  try {
-    const members = await Member.find().populate("memberships.membershipType");
-    const membersWithPT = await Promise.all(members.map(async (m) => {
-      const pt = await PTSession.find({ member: m._id });
-      return { ...m._doc, personalTraining: pt };
-    }));
-    res.json(membersWithPT);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  const members = await Member.find().populate("memberships.membershipType");
+  const withPT = await Promise.all(
+    members.map(async m => ({
+      ...m._doc,
+      personalTraining: await PTSession.find({ member: m._id })
+    }))
+  );
+  res.json(withPT);
 });
 
-
-// GET one member
-router.get("/:id", async (req, res) => {
-    try {
-      const member = await Member.findById(req.params.id)
-        .populate("memberships.membershipType");
-  
-      if (!member) return res.status(404).json({ error: "Member not found" });
-  
-      res.json(member);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-  
-
-// UPDATE member
-router.put("/:id", async (req, res) => {
-    try {
-        const updated = await Member.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true, runValidators: true }
-        );
-
-        if (!updated) {
-            return res.status(404).json({ error: "Member not found" });
-        }
-
-        res.json(updated);
-    } catch (err) {
-        res.status(400).json({ error: err.message });
-    }
+router.get("/:id/payments", async (req, res) => {
+  const payments = await Payment.find({ member: req.params.id })
+    .populate("membershipType", "name price category")
+    .sort({ date: -1 });
+  res.json(payments);
 });
-
-// DELETE member
-router.delete("/:id", async (req, res) => {
-    try {
-      const member = await Member.findByIdAndDelete(req.params.id);
-      if (!member) return res.status(404).json({ error: "Member not found" });
-  
-      // Optionally, delete all payments for this member
-      await Payment.deleteMany({ member: member._id });
-  
-      res.json({ message: "Member and payments deleted" });
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
 
 module.exports = router;

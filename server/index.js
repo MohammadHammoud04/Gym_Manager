@@ -3,6 +3,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
+const logRoutes = require("./routes/logRoutes");
 
 const app = express();
 app.use(cors());
@@ -17,6 +18,7 @@ app.use("/membership-types", require("./routes/membershipTypeRoutes.js"));
 app.use("/profit", require("./routes/profitRoutes.js"));
 app.use("/payments", require("./routes/paymentRoutes.js"));
 app.use("/sync", require("./routes/syncRoutes.js"))
+app.use("/logs", logRoutes);
 
 const localURI = "mongodb://127.0.0.1:27017/gym-manager";
 
@@ -43,6 +45,7 @@ async function createDefaultUsers() {
   const User = require("./models/User.js");
   const users = [
     { name: "admin", password: "admin123", role: "admin" },
+    { name: "admin2", password: "nicole123", role: "admin" }, 
     { name: "employee", password: "emp123", role: "employee" },
   ];
   for (let u of users) {

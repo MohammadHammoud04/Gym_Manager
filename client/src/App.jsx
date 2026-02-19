@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Routes, Route, Navigate, Link, useLocation, HashRouter} from "react-router-dom";
 import { 
   Dumbbell, LayoutDashboard, Users, CreditCard, 
-  ShoppingBag, Receipt, TrendingUp, LogOut,
+  ShoppingBag, Receipt, TrendingUp, LogOut, Logs
 } from "lucide-react";
 
 // Page Imports
@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Members from "./pages/Members";
 import Memberships from "./pages/Memberships";
 import Payments from "./pages/Payments";
+import Log from "./pages/Logs"
 import Dashboard from "./pages/Dashboard";
 import Expenses from "./pages/Expenses";
 import Sales from "./pages/Sales";
@@ -37,6 +38,7 @@ export default function App() {
     ...(role === "admin" ? [{ name: "Memberships", path: "/membership-types", icon: ShoppingBag }] : []),
     { name: "Sales", path: "/sales", icon: TrendingUp },
     { name: "Expenses", path: "/expenses", icon: Receipt },
+    ...(role === "admin" ? [{ name: "Log", path: "/log", icon: Logs }] : []),
   ];
 
   // 3. LOGGED IN DESIGN: The Premium Navbar + Page Content
@@ -105,6 +107,7 @@ export default function App() {
           <Route path="/payments" element={<Payments />} />
           <Route path="/expenses" element={<Expenses />} />
           <Route path="/sales" element={<Sales />} />
+          <Route path="/log" element={role === "admin" ? <Log/> : <Navigate to="/members" />} />
           
           {/* Default Fallback */}
           <Route path="*" element={<Navigate to="/members" />} />

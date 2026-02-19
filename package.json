@@ -6,7 +6,7 @@
   "author": "Mohammad",
   "scripts": {
     "dev": "concurrently \"cd client && npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
-    "build": "cd client && npm run build && cd ../server && npm install --production && mv node_modules modules_prod && cd .. && electron-builder"
+    "build": "cd client && npm run build && cd ../server && npm install --production && cd .. && electron-builder"
   },
   "build": {
     "appId": "com.gym.manager",
@@ -14,10 +14,12 @@
     "win": {
       "target": "nsis",
       "icon": "client/electron/favicon.ico",
-      "requestedExecutionLevel": "requireAdministrator"
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
-      "installerIcon": "client/electron/favicon.ico"
+      "installerIcon": "client/electron/favicon.ico",
+      "oneClick": false,
+      "perMachine": true
     },
     "files": [
       "client/dist/**/*",

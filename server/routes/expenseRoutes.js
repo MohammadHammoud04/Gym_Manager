@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Expense = require("../models/Expense");
 const Inventory = require("../models/Inventory");
+const Log = require("../models/Log2");
 
 // Add a new expense
 router.get("/", async (req, res) => {
@@ -14,7 +15,7 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/add", async (req, res) => {
-    const { name, amount, price, addToInventory, salePrice } = req.body;
+    const { name, amount, price, addToInventory, salePrice, userName } = req.body;
   
     try {
       let inventoryItem = null;
@@ -44,6 +45,14 @@ router.post("/add", async (req, res) => {
       });
   
       await newExpense.save();
+
+      await Log.create({
+        actionType: 'ADDITION',
+        module: 'EXPENSE',
+        details: `Added expense: ${name} (Qty: ${amount})`,
+        amount: -Number(price), 
+        userName: userName
+      });
   
       res.status(201).json(newExpense);
     } catch (err) {
@@ -55,6 +64,7 @@ router.post("/add", async (req, res) => {
   router.delete("/remove/:id", async (req, res) => {
     try {
       const expense = await Expense.findById(req.params.id);
+      const { userName } = req.body;
       if (!expense)
         return res.status(404).json({ message: "Expense not found" });
   
@@ -64,9 +74,17 @@ router.post("/add", async (req, res) => {
           { $inc: { currentStock: -expense.amount } }
         );
       }
-  
+      
+      await Log.create({
+        actionType: 'REFUND',
+        module: 'EXPENSE',
+        details: `Refunded/Deleted expense: ${expense.name}`,
+        amount: Number(expense.price),
+        userName: userName
+      });
+      
       await Expense.findByIdAndDelete(req.params.id);
-  
+
       res.json({ message: "Expense and inventory updated" });
     } catch (err) {
       res.status(500).json({ error: err.message });

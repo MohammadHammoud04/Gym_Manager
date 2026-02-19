@@ -26,8 +26,11 @@ export default function Expenses() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    const currentUser = localStorage.getItem("gymUser")
     try {
-      await axios.post("http://localhost:5000/expenses/add", formData)
+      await axios.post("http://localhost:5000/expenses/add", {...formData,
+        userName: currentUser
+      })
       setFormData({ name: "", amount: "", price: "", addToInventory: false, salePrice: "" })
       fetchExpenses()
     } catch (err) {
@@ -41,8 +44,11 @@ export default function Expenses() {
   }
 
   const handleDelete = async (id) => {
+    const currentUser = localStorage.getItem("gymUser")
       try {
-        await axios.delete(`http://localhost:5000/expenses/remove/${id}`);
+        await axios.delete(`http://localhost:5000/expenses/remove/${id}`,
+          {data: {userName:currentUser}}
+        );
         // Refresh both lists immediately
         await fetchExpenses();
         await fetchInventory();

@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Sale = require("../models/Sale");
 const Inventory = require("../models/Inventory");
+const Log = require("../models/Log2");
 
 // Get all sales
 router.get("/", async (req, res) => {
@@ -15,7 +16,7 @@ router.get("/", async (req, res) => {
 
 // Add a sale
 router.post("/add", async (req, res) => {
-    const { itemName, quantity, pricePerUnit, totalPrice, buyerName } = req.body;
+    const { itemName, quantity, pricePerUnit, totalPrice, buyerName, userName } = req.body;
 
     try {
         //Create the Sale record (for revenue tracking)
@@ -27,6 +28,14 @@ router.post("/add", async (req, res) => {
             buyerName : buyerName || ""
         });
         await newSale.save();
+
+        await Log.create({
+            actionType: 'SALE',
+            module: 'SALE',
+            details: `Sold ${quantity}x ${itemName} to ${buyerName || 'Walk-in'}`,
+            amount: Number(totalPrice),
+            userName: userName
+          });
 
         //Decrement stock from Inventory if the item exists
         const inventoryItem = await Inventory.findOneAndUpdate(
@@ -56,6 +65,16 @@ router.delete("/:id", async (req, res) => {
     try {
       // Find the sale first so we know what item and quantity to return
       const sale = await Sale.findById(req.params.id);
+      const {userName} = req.body; 
+
+      await Log.create({
+        actionType: 'REFUND',
+        module: 'SALE',
+        details: `Refunded sale: ${sale.itemName}`,
+        amount: -Number(sale.totalPrice),
+        userName: userName
+      });
+
       if (!sale) return res.status(404).json({ message: "Sale not found" });
   
       //Increment the stock back in Inventory

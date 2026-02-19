@@ -16,8 +16,8 @@ const paymentSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ["Membership", "PT", "Other"],
-    default: "Membership"
+    // enum: ["Membership", "PT", "Other"],
+    default: "Other"
   },
   discount: {
     type: Number,

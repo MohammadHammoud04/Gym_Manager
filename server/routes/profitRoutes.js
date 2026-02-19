@@ -96,28 +96,40 @@ router.get("/by-class", async (req, res) => {
   try {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
     const result = await Payment.aggregate([
       { $match: { date: { $gte: startOfMonth } } },
+
       {
         $lookup: {
-          from: "membershiptypes", 
+          from: "membershiptypes", // Ensure this matches your actual MongoDB collection name
           localField: "membershipType",
           foreignField: "_id",
-          as: "membership"
+          as: "typeInfo"
         }
       },
-      { $unwind: { path: "$membership", preserveNullAndEmptyArrays: true } },
+
+      { $unwind: { path: "$typeInfo", preserveNullAndEmptyArrays: true } },
+
       {
         $group: {
-          // If membership category exists, use it. Otherwise, use the Payment category (e.g., "PT")
-          _id: { $ifNull: ["$membership.category", "$category"] },
+          _id: { 
+            $cond: {
+              if: { $gt: [{ $ifNull: ["$typeInfo.category", ""] }, ""] },
+              then: "$typeInfo.category",
+              else: "$category" // Fallback to "PT" or "Other" if no typeInfo exists
+            }
+          },
           total: { $sum: "$amount" }
         }
       },
+
       { $sort: { total: -1 } }
     ]);
+
     res.json(result);
   } catch (err) {
+    console.error("By-Class Error:", err);
     res.status(500).json({ error: err.message });
   }
 });

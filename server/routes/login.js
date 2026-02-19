@@ -17,7 +17,7 @@ router.post("/", async (req, res) => {
 
     // Important: ensure JWT_SECRET is in your .env file
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id, role: user.role, name: user.name },
       process.env.JWT_SECRET || "fallback_secret_for_dev", 
       { expiresIn: "16h" }
     );
