@@ -70,7 +70,7 @@ router.post("/", async (req, res) => {
           startDate: today,
           endDate: endDate,
           quantity: quantity,
-          balance: debtForThis // Specific debt
+          balance: debtForThis 
         });
       }
 
@@ -99,7 +99,7 @@ router.post("/", async (req, res) => {
         { 
             $inc: { 
               sessionsLeft: Number(ptDetails.sessions),
-              balance: ptDebt // This separates debt by coach
+              balance: ptDebt 
             },
             $set: { type: ptDetails.type, pricePerSession: Number(ptDetails.price || 0) }
         },
@@ -145,7 +145,6 @@ router.put("/:id", async (req, res) => {
   try {
     const { info, userName } = req.body;
     
-    // Find member and update only the info field
     const member = await Member.findByIdAndUpdate(
       req.params.id,
       { $set: { info: info } },
@@ -208,7 +207,6 @@ router.patch("/:id/pay-balance", async (req, res) => {
       }
     }
 
-    // Create the Payment Record
     await Payment.create({
       member: member._id,
       membershipType: membershipTypeId,
@@ -221,7 +219,6 @@ router.patch("/:id/pay-balance", async (req, res) => {
 
     await member.save();
 
-    // Create the Log
     await Log.create({
       actionType: 'PAYMENT',
       module: 'MEMBER',
@@ -291,7 +288,6 @@ router.post("/:id/renew", async (req, res) => {
       }
     }
 
-    // PT RENEW
     if (ptDetails?.coachName) {
       const num = Number(ptDetails.sessions);
       const price = Number(ptDetails.price);
@@ -333,7 +329,6 @@ router.patch("/:id/memberships/:membershipId/dates", async (req, res) => {
     const membership = member.memberships.id(req.params.membershipId);
     if (!membership) return res.status(404).json({ error: "Membership not found" });
 
-    // Update the dates
     if (startDate) membership.startDate = new Date(startDate);
     if (endDate) membership.endDate = new Date(endDate);
 
@@ -445,7 +440,7 @@ router.patch("/:id/decrement-pt", async (req, res) => {
     }
 
     await Log.create({
-      actionType: 'UPDATE', // Consistent with your info update logs
+      actionType: 'UPDATE', 
       module: 'MEMBER',
       details: `PT Session decremented for ${member.name} (Coach: ${coachName}). Sessions left: ${session.sessionsLeft}`,
       userName: userName || "System"

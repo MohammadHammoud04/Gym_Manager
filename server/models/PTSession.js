@@ -27,7 +27,6 @@ const ptSessionSchema = new mongoose.Schema({
   balance: { type: Number, default: 0 },
 }, { timestamps: true });
 
-// Ensure a member can't have two separate records for the same coach
 ptSessionSchema.index({ member: 1, coachName: 1 }, { unique: true });
 
 module.exports = mongoose.model("PTSession", ptSessionSchema);

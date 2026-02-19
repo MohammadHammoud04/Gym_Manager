@@ -3,22 +3,21 @@ const router = express.Router();
 const Payment = require("../models/Payment");
 const Member = require("../models/Member");
 
-// GET recent payments (last payment per member)
+//get recent payments
 router.get("/recent", async (req, res) => {
   try {
     const recentPayments = await Payment.aggregate([
-      { $sort: { date: -1 } }, // newest first
+      { $sort: { date: -1 } }, 
       {
         $group: {
           _id: "$member",
-          payment: { $first: "$$ROOT" } // take latest payment per member
+          payment: { $first: "$$ROOT" } 
         }
       },
       { $replaceRoot: { newRoot: "$payment" } },
-      { $limit: 20 } // optional: limit to last 20 members
+      { $limit: 20 } 
     ]);
 
-    // Populate member and membershipType
     await Payment.populate(recentPayments, [
       { path: "member", select: "name phone" },
       { path: "membershipType", select: "name price category audience" }

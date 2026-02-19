@@ -34,13 +34,11 @@ const connectDB = async () => {
 
 connectDB();
 
-// 3. Status Check (Updated for simplicity)
 app.get("/api/db-status", (req, res) => {
   const isConnected = mongoose.connection.readyState === 1;
   res.json({ mode: "Local-Only", status: isConnected ? "Connected" : "Disconnected" });
 });
 
-// Default user logic stays the same
 async function createDefaultUsers() {
   const User = require("./models/User.js");
   const users = [

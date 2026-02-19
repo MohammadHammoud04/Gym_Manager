@@ -49,7 +49,6 @@ export default function Expenses() {
         await axios.delete(`http://localhost:5000/expenses/remove/${id}`,
           {data: {userName:currentUser}}
         );
-        // Refresh both lists immediately
         await fetchExpenses();
         await fetchInventory();
         setDeleteConfirm(null);
@@ -62,7 +61,7 @@ export default function Expenses() {
 
   return (
     <div className="min-h-screen bg-gym-black p-6 lg:p-8">
-      {/* Delete Confirmation Modal (Exactly like Members page) */}
+      {/* delete modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
           <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
@@ -93,7 +92,7 @@ export default function Expenses() {
         </div>
       )}
 
-      {/* Header */}
+      {/* header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <ShoppingCart className="w-8 h-8 text-gym-yellow" />
@@ -103,7 +102,7 @@ export default function Expenses() {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
-        {/* Form Section */}
+        {/* form */}
         <div className="lg:col-span-1">
           <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
             <div className="flex items-center gap-2 mb-6">
@@ -183,7 +182,7 @@ export default function Expenses() {
           </div>
         </div>
 
-        {/* List Section */}
+        {/* list */}
         <div className="lg:col-span-2">
           <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
             <div className="flex items-center gap-2 mb-6">
@@ -213,7 +212,6 @@ export default function Expenses() {
                         <p className="text-gym-gray-text text-xs">Expense</p>
                       </div>
                       
-                      {/* Trash Icon Button */}
                       <button
                         onClick={() => setDeleteConfirm(exp)}
                         className="w-10 h-10 rounded-full bg-red-500/10 border-2 border-red-500/50 flex items-center justify-center hover:bg-red-500/20 hover:border-red-500 transition-all "

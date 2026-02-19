@@ -19,7 +19,6 @@ router.post("/add", async (req, res) => {
     const { itemName, quantity, pricePerUnit, totalPrice, buyerName, userName } = req.body;
 
     try {
-        //Create the Sale record (for revenue tracking)
         const newSale = new Sale({
             itemName,
             quantity: Number(quantity),
@@ -37,7 +36,6 @@ router.post("/add", async (req, res) => {
             userName: userName
           });
 
-        //Decrement stock from Inventory if the item exists
         const inventoryItem = await Inventory.findOneAndUpdate(
             { 
                 name: itemName.toLowerCase().trim(),
@@ -63,7 +61,6 @@ router.post("/add", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
     try {
-      // Find the sale first so we know what item and quantity to return
       const sale = await Sale.findById(req.params.id);
       const {userName} = req.body; 
 
@@ -77,7 +74,6 @@ router.delete("/:id", async (req, res) => {
 
       if (!sale) return res.status(404).json({ message: "Sale not found" });
   
-      //Increment the stock back in Inventory
       await Inventory.findOneAndUpdate(
         { name: sale.itemName.toLowerCase().trim() },
         { $inc: { currentStock: sale.quantity } }

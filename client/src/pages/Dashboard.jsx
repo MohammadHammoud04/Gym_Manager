@@ -66,23 +66,19 @@ export default function Dashboard() {
         const statusRes = await axios.get("http://localhost:5000/api/db-status");
         setDbMode(statusRes.data.mode);
   
-        // 1. Fetch Coach Data
         try {
           const coachRes = await axios.get("http://localhost:5000/profit/by-coach");
           setProfitByCoach(coachRes.data);
         } catch (e) { console.error("Coach data failed", e); }
   
-        // 2. Set default dates for the Range Calculator
         const now = new Date();
         const offset = now.getTimezoneOffset() * 60000;
         const todayStr = new Date(now - offset).toISOString().split("T")[0];
         setStartDate(todayStr);
         setEndDate(todayStr);
   
-        // 3. GET ALL TOTALS (Yearly, Monthly, Daily)
         const totalRes = await axios.get("http://localhost:5000/profit/total");
 
-// Explicitly log this to your browser console to see what's happening
     console.log("BACKEND DATA RECEIVED:", totalRes.data);
 
     setTotalRevenue(totalRes.data.yearly.revenue);
@@ -98,11 +94,9 @@ export default function Dashboard() {
       setTodayExpenses(totalRes.data.daily.expenses);
       setTodayProfit(totalRes.data.daily.netProfit);
     }
-        // 4. Fetch Class Data
         const byClassRes = await axios.get("http://localhost:5000/profit/by-class");
         setProfitByClass(byClassRes.data);
   
-        // --- REMOVED THE TWO fetchRangeProfit CALLS FROM HERE ---
   
       } catch (err) {
         console.error("Dashboard fetch error:", err);
@@ -143,14 +137,12 @@ export default function Dashboard() {
     setSyncConfirm({
       title: "Database Overwrite",
       message: "This will permanently delete all local members, payments, and sales and replace them with the data from this file.",
-      type: "danger" // Using danger for the red/yellow warning style
+      type: "danger" 
     });
     
-    // Reset the input so you can select the same file twice if needed
     event.target.value = ''; 
   };
   
-  // Triggered when user clicks "Confirm" in the modal
   const executeImport = async () => {
     if (!pendingFile) return;
   
@@ -162,7 +154,6 @@ export default function Dashboard() {
         const content = JSON.parse(e.target.result);
         await axios.post("http://localhost:5000/sync/import", content);
         
-        // Success state change
         setSyncConfirm({
           title: "Success!",
           message: "The database has been updated. The page will now reload.",
@@ -247,7 +238,7 @@ export default function Dashboard() {
       )}
 
         <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-3 mb-8">
-          {/* YEARLY CARD */}
+          {/* yearly card */}
           <div className="bg-gym-gray-dark border-2 border-gym-yellow rounded-2xl p-6 shadow-xl">
             <p className="text-gym-gray-text text-xs font-bold mb-1 uppercase tracking-wider">Yearly Overview (2026)</p>
             <h3 className="text-3xl font-black text-white">${totalProfit} <span className="text-sm font-normal text-gym-gray-text">Net</span></h3>
@@ -257,7 +248,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* MONTHLY CARD */}
+          {/* monthly card */}
           <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-xl">
             <p className="text-gym-gray-text text-xs font-bold mb-1 uppercase tracking-wider">Current Month Pulse</p>
             <h3 className="text-3xl font-black text-white">${monthProfit} <span className="text-sm font-normal text-gym-gray-text">Net</span></h3>
@@ -279,13 +270,7 @@ export default function Dashboard() {
 
       </div>
 
-        {/* <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-xl hover:border-gym-yellow transition-all">
-          <p className="text-gym-gray-text text-xs font-semibold mb-1">THIS MONTH</p>
-          <h3 className="text-2xl font-bold text-white">${monthProfit}</h3>
-          <p className="text-gym-gray-text text-[10px]">Monthly Total</p>
-        </div>
-      </div> */}
-
+        
       <div className="grid lg:grid-cols-2 gap-8">
         
         <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
@@ -344,7 +329,6 @@ export default function Dashboard() {
           {profitByCoach.length > 0 ? (
             profitByCoach.map((coach) => (
               <div key={coach._id} className="relative overflow-hidden bg-gym-black border border-gym-gray-border p-5 rounded-xl group hover:border-gym-yellow transition-all">
-                {/* Decorative background accent */}
                 <div className="absolute -right-4 -top-4 w-16 h-16 bg-gym-yellow/5 rounded-full blur-2xl group-hover:bg-gym-yellow/10 transition-all" />
                 
                 <div className="flex justify-between items-start mb-4">

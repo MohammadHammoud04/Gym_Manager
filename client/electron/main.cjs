@@ -49,7 +49,6 @@ function createWindow() {
   });
 }
 
-// IPC Handlers
 ipcMain.handle("show-message-box", async (event, options) => {
   return await dialog.showMessageBox(options);
 });

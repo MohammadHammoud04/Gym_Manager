@@ -15,7 +15,6 @@ router.post("/", async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
-    // Important: ensure JWT_SECRET is in your .env file
     const token = jwt.sign(
       { id: user._id, role: user.role, name: user.name },
       process.env.JWT_SECRET || "fallback_secret_for_dev", 
@@ -29,4 +28,4 @@ router.post("/", async (req, res) => {
   }
 });
 
-module.exports = router; // The CommonJS way
+module.exports = router; 

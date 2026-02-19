@@ -19,7 +19,7 @@ router.get("/", async (req, res) => {
     res.json(memberships);
 });
 
-// READ ONE
+// read one
 router.get("/:id", async (req, res) => {
     const membership = await MembershipType.findById(req.params.id);
     if (!membership) return res.status(404).json({ error: "Not found" });

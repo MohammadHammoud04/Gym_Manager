@@ -1,5 +1,5 @@
 import React from "react";
-import "../index.css"; // Make sure your CSS is imported
+import "../index.css"; 
 
 export default function Layout({ children }) {
   return (

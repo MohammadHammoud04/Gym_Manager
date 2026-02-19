@@ -12,10 +12,10 @@ const capitalizeWords = (str) => {
 
 const membershipTypeSchema = new mongoose.Schema({
   name: { type: String, required: true, set: capitalizeWords },
-  category: { type: String, required: true, set: capitalizeWords }, // Gym, Muai Thai, etc
-  audience: { type: String, required: true, set: capitalizeWords }, // Adult / Kids
+  category: { type: String, required: true, set: capitalizeWords }, 
+  audience: { type: String, required: true, set: capitalizeWords },
   price: { type: Number, required: true },
-  durationInDays: { type: Number, required: true } // duration of membership
+  durationInDays: { type: Number, required: true } 
 });
 
 module.exports = mongoose.model("MembershipType", membershipTypeSchema);

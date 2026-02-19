@@ -136,18 +136,15 @@ export default function Members() {
   const handleAddMember = async () => {
     const currentUser = localStorage.getItem("gymUser"); 
     try {
-      // 1. Calculate Membership Total Safely
       const mTotal = newMember.memberships.reduce((sum, m) => {
         const type = membershipTypes.find(mt => mt._id === m.membershipTypeId);
-        if (!type) return sum; // Safety check
+        if (!type) return sum; 
         const qty = m.quantity || 1;
         return sum + (Number(type.price) * qty - Number(m.discount || 0));
       }, 0);
   
-      // 2. Calculate PT Total
       const ptTotal = Number(ptForm.sessions || 0) * Number(ptForm.price || 0);
   
-      // 3. Final Total to send to backend
       const finalGrandTotal = mTotal + ptTotal;
   
       const payload = {
@@ -165,7 +162,6 @@ export default function Members() {
         count: res.data.payments.length 
       });
   
-      // 4. Reset everything correctly
       setNewMember({ 
         name: "", 
         phone: "", 
@@ -333,7 +329,7 @@ export default function Members() {
 
   return (
     <div className="min-h-screen bg-gym-black p-6 lg:p-8">
-      {/* Success Modal */}
+      {/* success modal */}
       {showSuccess && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
           <div className="bg-gym-gray-dark border-2 border-gym-yellow rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl text-center">
@@ -353,7 +349,7 @@ export default function Members() {
         </div>
       )}
 
-      {/* Membership Details Modal */}
+      {/* membership details modal */}
       {membershipDetails && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
           <div className="bg-gym-gray-dark border-2 border-gym-yellow rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl text-center">
@@ -486,7 +482,7 @@ export default function Members() {
         </div>
       )}
 
-      {/* Confirm Modal */}
+      {/* confirm modal */}
       {confirmAction && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60]">
           <div className="bg-gym-gray-dark border-2 border-gym-yellow rounded-2xl p-6 max-w-xs w-full mx-4 shadow-2xl text-center">
@@ -523,7 +519,7 @@ export default function Members() {
         </div>
       )}
 
-      {/* Delete Confirm Modal */}
+      {/* delete confirm modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
           <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl text-center">
@@ -548,7 +544,7 @@ export default function Members() {
         </div>
       )}
 
-      {/* Info Modal */}
+      {/* info modal */}
       {infoModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
           <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
@@ -599,7 +595,7 @@ export default function Members() {
         </div>
       )}
 
-      {/* Header */}
+      {/* header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <Users className="w-8 h-8 text-gym-yellow" />
@@ -609,7 +605,7 @@ export default function Members() {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
-        {/* Form Section - Left */}
+        {/* form/left */}
         <div className="lg:col-span-1">
           <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
             <div className="flex items-center gap-2 mb-6">
@@ -749,7 +745,7 @@ export default function Members() {
           </div>
         </div>
 
-        {/* List Section - Right */}
+        {/* list/right */}
         <div className="lg:col-span-2">
           <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
@@ -765,7 +761,7 @@ export default function Members() {
               </div>
             </div>
 
-            {/* Filters */}
+            {/* filters */}
             <div className="mb-6 flex flex-wrap gap-4">
               {["all", "pt", "inactive", "expiring", "frozen"].map((filter) => (
                 <button
@@ -786,7 +782,7 @@ export default function Members() {
               ))}
             </div>
 
-            {/* Members Grid */}
+            {/* members grid */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
               {filteredMembers.length > 0 ? (
                 filteredMembers.map((member) => (
@@ -868,7 +864,6 @@ export default function Members() {
                         <p className="text-[10px] font-black uppercase text-gym-gray-text mb-2">Personal Training</p>
                         <div className="space-y-2">
                         {member.personalTraining
-                          // 1. Show sessions if they have uses left OR if there is unpaid debt
                           .filter(pt => pt.sessionsLeft > 0 || (pt.balance && pt.balance > 0))
                           .map((pt, idx) => (
                             <div key={idx} className="bg-gym-black/40 p-2 rounded-lg border border-gym-gray-border/50 space-y-2">
@@ -876,7 +871,6 @@ export default function Members() {
                                 <div className="flex flex-col">
                                   <span className="text-xs font-black text-white uppercase">{pt.coachName}</span>
                                   
-                                  {/* 2. Display the SPECIFIC debt for this coach */}
                                   {pt.balance > 0 && (
                                     <span className="text-red-500 text-[9px] font-bold uppercase">
                                       Debt: ${pt.balance}
@@ -896,7 +890,6 @@ export default function Members() {
                                 </button>
                               </div>
 
-                              {/* 3. Logic to pay only THIS coach's debt */}
                               {pt.balance > 0 && (
                                 <button 
                                   onClick={() => {
@@ -935,7 +928,7 @@ export default function Members() {
         </div>
       </div>
 
-      {/* Payment Modal */}
+      {/* payment modal */}
       {paymentModal.isOpen && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
           <div className="bg-gym-gray-dark border-2 border-gym-gray-border p-6 rounded-xl max-w-sm w-full">

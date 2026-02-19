@@ -5,7 +5,6 @@ import {
   ShoppingBag, Receipt, TrendingUp, LogOut, Logs
 } from "lucide-react";
 
-// Page Imports
 import Login from "./pages/Login";
 import Members from "./pages/Members";
 import Memberships from "./pages/Memberships";
@@ -25,12 +24,13 @@ export default function App() {
     setRole(null);
   };
 
-  // 1. IF NOT LOGGED IN: Show only the Login screen
   if (!role) {
-    return <Login onLogin={(r) => setRole(r)} />;
+    return <Login onLogin={(r) => {
+      localStorage.setItem("role", r);
+      setRole(r);
+    }} />;
   }
 
-  // 2. NAV ITEMS: Filtered based on role
   const navItems = [
     ...(role === "admin" ? [{ name: "Dashboard", path: "/dashboard", icon: LayoutDashboard }] : []),
     { name: "Members", path: "/members", icon: Users },
@@ -41,15 +41,13 @@ export default function App() {
     ...(role === "admin" ? [{ name: "Log", path: "/log", icon: Logs }] : []),
   ];
 
-  // 3. LOGGED IN DESIGN: The Premium Navbar + Page Content
   return (
     <div className="min-h-screen bg-gym-black flex flex-col text-white">
       
-      {/* --- PREMIUM NAVBAR START --- */}
       <nav className="bg-gym-gray-dark border-b-2 border-gym-gray-border px-6 py-4 w-full sticky top-0 z-50">
         <div className="flex items-center max-w-7xl mx-auto">
           
-          {/* Logo Section */}
+          {/* logo */}
           <div className="flex-1 flex items-center gap-2">
           <img src={logo} alt="Gym Logo" className="w-17 h-17 object-contain"/>
             <span className="text-3xl font-bold text-white tracking-tighter">
@@ -57,7 +55,7 @@ export default function App() {
             </span>
           </div>
 
-          {/* Links Section */}
+          {/* links */}
           <div className="hidden md:flex items-center bg-gym-black/50 rounded-2xl p-1 border border-gym-gray-border shadow-inner">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -79,7 +77,7 @@ export default function App() {
             })}
           </div>
 
-          {/* Logout Section */}
+          {/* logout */}
           <div className="flex-1 flex justify-end">
             <button 
               onClick={handleLogout}
@@ -96,9 +94,8 @@ export default function App() {
           
         </div>
       </nav>
-      {/* --- PREMIUM NAVBAR END --- */}
 
-      {/* Main Content Area */}
+      {/* main content */}
       <main className="flex-grow w-full max-w-7xl mx-auto p-6">
         <Routes>
           <Route path="/dashboard" element={role === "admin" ? <Dashboard /> : <Navigate to="/members" />} />
@@ -109,7 +106,7 @@ export default function App() {
           <Route path="/sales" element={<Sales />} />
           <Route path="/log" element={role === "admin" ? <Log/> : <Navigate to="/members" />} />
           
-          {/* Default Fallback */}
+          {/* default fallback */}
           <Route path="*" element={<Navigate to="/members" />} />
         </Routes>
       </main>

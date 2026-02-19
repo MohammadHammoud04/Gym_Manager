@@ -6,7 +6,6 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Adding gym-specific color variables for black, gray, and yellow theme */
   --gym-black: #0a0a0a;
   --gym-black-dark: #000000;
   --gym-gray: #1a1a1a;
@@ -90,7 +89,6 @@
   --font-sans: "Geist", "Geist Fallback";
   --font-mono: "Geist Mono", "Geist Mono Fallback";
 
-  /* Adding gym color system to Tailwind theme */
   --color-gym-black: var(--gym-black);
   --color-gym-black-dark: var(--gym-black-dark);
   --color-gym-gray: var(--gym-gray);
@@ -146,7 +144,6 @@
     @apply bg-background text-foreground;
   }
 
-  /* Custom scrollbar styling for gym theme */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -187,7 +184,7 @@
 }
 
 select option {
-  background-color: #1a1a1a; /* Matching --gym-gray */
+  background-color: #1a1a1a; 
   color: white;
   padding: 10px;
 }

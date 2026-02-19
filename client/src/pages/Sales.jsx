@@ -179,16 +179,16 @@ export default function Sales() {
       )}
 
         <div className="flex flex-col lg:flex-row justify-between items-start gap-6 mb-8">
-          {/* Left: Title */}
+          {/* left */}
           <div className="flex items-center gap-3">
             <Coffee className="w-10 h-10 text-gym-yellow" />
             <h1 className="text-4xl font-bold text-white tracking-tight">Shop & Inventory</h1>
           </div>
 
-          {/* Right: Stats Cards (Matching Dashboard Style) */}
+          {/* right */}
           <div className="flex flex-wrap gap-4 w-full lg:w-auto">
             
-            {/* Today's Transactions (Calculated locally from sales list) */}
+            {/* transactions */}
             <div className="flex-1 lg:flex-none bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-4 min-w-[160px] flex items-center justify-between shadow-xl">
               <div>
                 <p className="text-gym-gray-text text-[10px] font-bold uppercase tracking-widest">Transactions</p>
@@ -199,7 +199,7 @@ export default function Sales() {
               <Receipt className="w-6 h-6 text-gym-gray-text opacity-30" />
             </div>
 
-            {/* Today's Total Revenue (From /profit/total route) */}
+            {/* revenue */}
             <div className="flex-1 lg:flex-none bg-gym-gray-dark border-2 border-gym-yellow rounded-2xl p-4 min-w-[200px] flex items-center justify-between shadow-xl">
               <div>
                 <p className="text-gym-yellow text-[10px] font-bold uppercase tracking-widest">Today's Revenue</p>
@@ -212,7 +212,7 @@ export default function Sales() {
           </div>
         </div>
 
-      {/* Quick Sell Inventory Section */}
+      {/* inventory */}
       <div className="mb-10">
         <div className="flex items-center gap-2 mb-4 text-white">
           <Zap className="w-5 h-5 text-gym-yellow" />
@@ -249,7 +249,7 @@ export default function Sales() {
       <hr className="border-gym-gray-border mb-10" />
 
       <div className="grid gap-8 lg:grid-cols-3">
-        {/* Manual Sale Form */}
+        {/* sale form */}
         <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl h-fit">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <Plus className="text-gym-yellow" /> Manual Entry
@@ -289,7 +289,7 @@ export default function Sales() {
           </form>
         </div>
 
-        {/* History Section */}
+        {/* history */}
         <div className="lg:col-span-2 bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <Receipt className="text-gym-yellow" /> Recent Sales
@@ -319,7 +319,6 @@ export default function Sales() {
                     <p className="text-green-500 font-bold text-lg">+${sale.totalPrice}</p>
                     <p className="text-gym-gray-text text-[10px]">REVENUE</p>
                   </div>
-                  {/* --- CONNECTED DELETE BUTTON --- */}
                   <button 
                     onClick={() => setDeleteConfirm(sale)} 
                     className="p-2 text-gym-gray-text hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"

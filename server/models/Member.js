@@ -74,6 +74,5 @@ memberSchema.pre("validate", function () {
   if (this.phone) {
     this.phone = this.phone.trim();
   }
-  // No next() call needed for synchronous hooks in modern Mongoose
 });
 module.exports = mongoose.model("Member", memberSchema);

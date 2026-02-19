@@ -1,6 +1,5 @@
 const express = require("express");
 const router = express.Router();
-// Import all relevant models
 const Member = require("../models/Member");
 const Payment = require("../models/Payment");
 const Sale = require("../models/Sale");
@@ -9,7 +8,7 @@ const Inventory = require("../models/Inventory");
 const MembershipType = require("../models/MembershipType");
 const PTSession = require("../models/PTSession");
 
-// 1. EXPORT ALL DATA
+//export data
 router.get("/export", async (req, res) => {
     try {
         const data = {
@@ -28,12 +27,11 @@ router.get("/export", async (req, res) => {
     }
 });
 
-// 2. IMPORT & OVERWRITE DATA
+// import data
 router.post("/import", async (req, res) => {
     try {
         const { members, payments, sales, expenses, inventory, membershipTypes, ptSessions } = req.body;
 
-        // Step A: Wipe existing collections (Excluding Users)
         await Promise.all([
             Member.deleteMany({}),
             Payment.deleteMany({}),
@@ -44,7 +42,6 @@ router.post("/import", async (req, res) => {
             PTSession.deleteMany({})
         ]);
 
-        // Step B: Inject new data only if arrays exist
         if (members?.length) await Member.insertMany(members);
         if (payments?.length) await Payment.insertMany(payments);
         if (sales?.length) await Sale.insertMany(sales);

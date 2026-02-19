@@ -43,7 +43,6 @@ router.get("/total", async (req, res) => {
   try {
     const now = new Date();
 
-    // Force Local Midnight
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfYear = new Date(now.getFullYear(), 0, 1);
@@ -102,7 +101,7 @@ router.get("/by-class", async (req, res) => {
 
       {
         $lookup: {
-          from: "membershiptypes", // Ensure this matches your actual MongoDB collection name
+          from: "membershiptypes", 
           localField: "membershipType",
           foreignField: "_id",
           as: "typeInfo"
@@ -117,7 +116,7 @@ router.get("/by-class", async (req, res) => {
             $cond: {
               if: { $gt: [{ $ifNull: ["$typeInfo.category", ""] }, ""] },
               then: "$typeInfo.category",
-              else: "$category" // Fallback to "PT" or "Other" if no typeInfo exists
+              else: "$category" 
             }
           },
           total: { $sum: "$amount" }
@@ -153,19 +152,16 @@ router.get("/by-class", async (req, res) => {
           };
         }
     
-        // 1. Get Membership Revenue for this range
         const paymentResult = await Payment.aggregate([
           { $match: match },
           { $group: { _id: null, total: { $sum: "$amount" } } }
         ]);
     
-        // 2. Get Shop Sales Revenue for this range
         const saleResult = await Sale.aggregate([
           { $match: match },
           { $group: { _id: null, total: { $sum: "$totalPrice" } } }
         ]);
     
-        // 3. Get Expenses for this range
         const expenseResult = await Expense.aggregate([
           { $match: match },
           { $group: { _id: null, total: { $sum: "$price" } } }
@@ -174,7 +170,6 @@ router.get("/by-class", async (req, res) => {
         const totalRevenue = (paymentResult[0]?.total || 0) + (saleResult[0]?.total || 0);
         const totalExpenses = expenseResult[0]?.total || 0;
     
-        // The result is the Net Profit for the specific day/month
         res.json({ 
           total: totalRevenue - totalExpenses,
           revenue: totalRevenue,

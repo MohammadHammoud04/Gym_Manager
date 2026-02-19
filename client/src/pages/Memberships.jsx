@@ -16,7 +16,6 @@ export default function Memberships() {
   const [editingId, setEditingId] = useState(null)
   const [search, setSearch] = useState("")
 
-  // Fetch all memberships
   const fetchMemberships = async () => {
     const res = await axios.get("http://localhost:5000/membership-types")
     setMemberships(res.data)
@@ -73,7 +72,7 @@ export default function Memberships() {
     setNewMembership({ name: "", category: "", audience: "", price: "", durationInDays: "" })
   }
 
-  // Filter memberships by search
+  // filter memberships by search
   const filtered = memberships.filter(
     (m) =>
       m.name.toLowerCase().includes(search.toLowerCase()) || m.category.toLowerCase().includes(search.toLowerCase()),
@@ -81,7 +80,7 @@ export default function Memberships() {
 
   return (
     <div className="min-h-screen bg-gym-black p-6 lg:p-8">
-      {/* Header Section */}
+      {/* header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <CreditCard className="w-8 h-8 text-gym-yellow" />
@@ -90,7 +89,7 @@ export default function Memberships() {
         <p className="text-gym-gray-text text-lg">Create and manage membership plans</p>
       </div>
 
-      {/* Search Section */}
+      {/* search */}
       <div className="mb-8 relative">
         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gym-gray-text" />
         <input
@@ -101,7 +100,7 @@ export default function Memberships() {
         />
       </div>
 
-      {/* Add/Edit Membership Form */}
+      {/* form */}
       <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 lg:p-8 mb-8 shadow-2xl">
         <div className="flex items-center gap-2 mb-6">
           {editingId ? (
@@ -190,21 +189,20 @@ export default function Memberships() {
         </div>
       </div>
 
-      {/* Memberships Count */}
+      {/* membership count */}
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-white">
           All Membership Types <span className="text-gym-yellow">({filtered.length})</span>
         </h2>
       </div>
 
-      {/* Memberships Grid */}
+      {/* memberships grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((m) => (
           <div
             key={m._id}
             className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-xl hover:border-gym-yellow transition-all hover:shadow-gym-yellow/10"
           >
-            {/* Membership Header */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <h3 className="text-xl font-bold text-white mb-1">{m.name}</h3>
@@ -215,7 +213,7 @@ export default function Memberships() {
               </div>
             </div>
 
-            {/* Membership Details */}
+            {/* membership details */}
             <div className="space-y-3 mb-4">
               <div className="flex items-center gap-2 text-gym-gray-text">
                 <Users className="w-4 h-4" />
@@ -239,7 +237,7 @@ export default function Memberships() {
               </div>
             </div>
 
-            {/* Action Buttons */}
+            {/* buttons */}
             <div className="flex gap-2">
               <button
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gym-yellow/10 border-2 border-gym-yellow text-gym-yellow font-semibold hover:bg-gym-yellow hover:text-gym-black-dark transition-all transform hover:scale-105"
@@ -261,7 +259,7 @@ export default function Memberships() {
         ))}
       </div>
 
-      {/* Empty State */}
+      {/* empty state */}
       {filtered.length === 0 && (
         <div className="text-center py-16">
           <CreditCard className="w-16 h-16 text-gym-gray-border mx-auto mb-4" />
