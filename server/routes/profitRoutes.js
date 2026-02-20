@@ -93,12 +93,24 @@ router.get("/total", async (req, res) => {
 // Profit per class
 router.get("/by-class", async (req, res) => {
   try {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const { start, end } = req.query;
+    const match = {};
+
+    if (start && end) {
+      const startDate = new Date(start);
+      startDate.setHours(0, 0, 0, 0);
+
+      const endDate = new Date(end);
+      endDate.setHours(23, 59, 59, 999);
+
+      match.date = { $gte: startDate, $lte: endDate };
+    } else {
+      const now = new Date();
+      match.date = { $gte: new Date(now.getFullYear(), now.getMonth(), 1) };
+    }
 
     const result = await Payment.aggregate([
-      { $match: { date: { $gte: startOfMonth } } },
-
+      { $match: match }, 
       {
         $lookup: {
           from: "membershiptypes", 
@@ -107,9 +119,7 @@ router.get("/by-class", async (req, res) => {
           as: "typeInfo"
         }
       },
-
       { $unwind: { path: "$typeInfo", preserveNullAndEmptyArrays: true } },
-
       {
         $group: {
           _id: { 
@@ -122,7 +132,6 @@ router.get("/by-class", async (req, res) => {
           total: { $sum: "$amount" }
         }
       },
-
       { $sort: { total: -1 } }
     ]);
 

@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const Log = require("../models/Log2");
-const auth = require("../middleware/auth");
 
 router.get("/", async (req, res) => {
   try {

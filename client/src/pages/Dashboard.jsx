@@ -27,8 +27,10 @@ export default function Dashboard() {
   const [endDate, setEndDate] = useState("")
   const [rangeProfit, setRangeProfit] = useState(0)
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncConfirm, setSyncConfirm] = useState(null); // Controls the modal
+  const [syncConfirm, setSyncConfirm] = useState(null); 
   const [pendingFile, setPendingFile] = useState(null);
+  const [classStartDate, setClassStartDate] = useState("");
+  const [classEndDate, setClassEndDate] = useState("");
 
   const fetchRangeProfit = async (start, end, setter) => {
     try {
@@ -38,6 +40,15 @@ export default function Dashboard() {
       console.error("Range fetch error:", err)
     }
   }
+
+  const fetchClassProfit = async () => {
+    try {
+      const res = await axios.get(`http://localhost:5000/profit/by-class?start=${classStartDate}&end=${classEndDate}`);
+      setProfitByClass(res.data);
+    } catch (err) {
+      console.error("Class profit fetch error:", err);
+    }
+  };
 
   // const handleSync = async (type) => {
   //   setSyncStatus("syncing");
@@ -72,10 +83,10 @@ export default function Dashboard() {
         } catch (e) { console.error("Coach data failed", e); }
   
         const now = new Date();
-        const offset = now.getTimezoneOffset() * 60000;
-        const todayStr = new Date(now - offset).toISOString().split("T")[0];
-        setStartDate(todayStr);
-        setEndDate(todayStr);
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+        setClassStartDate(firstDay);
+        setClassEndDate(lastDay);
   
         const totalRes = await axios.get("http://localhost:5000/profit/total");
 
@@ -273,24 +284,49 @@ export default function Dashboard() {
         
       <div className="grid lg:grid-cols-2 gap-8">
         
-        <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
-        <div className="flex items-center gap-2 mb-6">
-          <TrendingUp className="w-6 h-6 text-gym-yellow" />
-          <h2 className="text-2xl font-bold text-white uppercase tracking-tight">Monthly Class Profit</h2>
-        </div>
-          <div className="space-y-3">
-            {profitByClass.length > 0 ? (
-              profitByClass.map((item) => (
-                <div key={item._id} className="flex items-center justify-between p-4 rounded-xl bg-gym-gray border border-gym-gray-border">
-                  <span className="text-white font-semibold">{item._id || "Other"}</span>
-                  <p className="text-gym-yellow font-bold text-lg">${item.total}</p>
-                </div>
-              ))
-            ) : (
-              <p className="text-gym-gray-text text-center py-10">No class data found</p>
-            )}
+      <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-6 h-6 text-gym-yellow" />
+            <h2 className="text-2xl font-bold text-white uppercase tracking-tight">Class Profit</h2>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <input 
+              type="date" 
+              className="bg-gym-black border border-gym-gray-border text-white text-xs p-2 rounded-lg outline-none focus:border-gym-yellow" 
+              value={classStartDate} 
+              onChange={(e) => setClassStartDate(e.target.value)} 
+            />
+            <span className="text-gym-gray-text text-xs">to</span>
+            <input 
+              type="date" 
+              className="bg-gym-black border border-gym-gray-border text-white text-xs p-2 rounded-lg outline-none focus:border-gym-yellow" 
+              value={classEndDate} 
+              onChange={(e) => setClassEndDate(e.target.value)} 
+            />
+            <button 
+              onClick={fetchClassProfit}
+              className="p-2 bg-gym-yellow text-gym-black rounded-lg hover:bg-gym-yellow-bright transition-colors"
+            >
+              <Search size={16} />
+            </button>
           </div>
         </div>
+
+        <div className="space-y-3">
+          {profitByClass.length > 0 ? (
+            profitByClass.map((item) => (
+              <div key={item._id} className="flex items-center justify-between p-4 rounded-xl bg-gym-gray border border-gym-gray-border">
+                <span className="text-white font-semibold">{item._id || "Other"}</span>
+                <p className="text-gym-yellow font-bold text-lg">${item.total}</p>
+              </div>
+            ))
+          ) : (
+            <p className="text-gym-gray-text text-center py-10">No class data for this range</p>
+          )}
+        </div>
+      </div>
 
         <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
           <div className="flex items-center gap-2 mb-6">
