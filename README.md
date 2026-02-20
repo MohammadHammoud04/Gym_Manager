@@ -34,6 +34,7 @@ The goal of the application is to replace manual tracking systems with a structu
 - Sales performance tracking
 - Member activity monitoring
 - Financial breakdown visualization
+- Export and import data
 
 ### 🔐 Backend Architecture
 - RESTful API structure
@@ -77,10 +78,55 @@ The application follows a modular backend structure using routes, controllers, a
 
 ## 📂 Project Structure
 
-/client → React frontend
-/server → Express backend
-server/routes
-server/models
+- /client → React frontend
+- /server → Express backend
+- server/routes
+- server/models
+
+---
 
 ## ⚙ Installation & Setup
 
+git clone https://github.com/MohammadHammoud04/Gym_Manager.git
+cd Gym_Manager
+
+### 2️⃣ Install dependencies
+
+Frontend:
+cd client
+npm install
+
+
+Backend:
+cd server
+npm install
+
+Root:
+npm install
+
+### 3️⃣ Environment Variables
+
+Create a `.env` file inside `/server`:
+Follow the .env.example file
+
+### 4️⃣ Run the application
+
+cd ..
+npm run dev
+
+---
+## 📸 Screenshots
+
+![Capture](https://github.com/user-attachments/assets/12e8c529-74f3-4982-8644-856e23011de6)
+
+---
+
+## Notes
+
+You should note that the buttons for syncing the atlas with the local database and vice versa are removed and should be added as well as the syncRoutes.js file, they should be added if you want to use the feature.
+
+---
+## 👨‍💻 Author
+
+Mohammad Hammoud  
+Full-Stack Developer
