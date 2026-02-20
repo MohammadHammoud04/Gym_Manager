@@ -87,8 +87,8 @@ The application follows a modular backend structure using routes, controllers, a
 
 ## ⚙ Installation & Setup
 
-git clone https://github.com/MohammadHammoud04/Gym_Manager.git
-cd Gym_Manager
+- git clone https://github.com/MohammadHammoud04/Gym_Manager.git
+- cd Gym_Manager
 
 ### 2️⃣ Install dependencies
 
@@ -106,13 +106,13 @@ npm install
 
 ### 3️⃣ Environment Variables
 
-Create a `.env` file inside `/server`:
-Follow the .env.example file
+- Create a `.env` file inside `/server`:
+- Follow the .env.example file
 
 ### 4️⃣ Run the application
 
-cd ..
-npm run dev
+- cd ..
+- npm run dev
 
 ---
 ## 📸 Screenshots
