@@ -640,33 +640,79 @@ export default function Members() {
                 <label className="block text-gym-gray-text text-sm mb-2">Memberships</label>
                 <div className="bg-gym-black/40 border-2 border-gym-gray-border rounded-xl p-2 max-h-[200px] overflow-y-auto">
                   {membershipTypes.map((m) => {
-                    const selected = newMember.memberships.find((x) => x.membershipTypeId === m._id)
+                    const selected = newMember.memberships.find((x) => x.membershipTypeId === m._id);
+                    const isGuest = m.category?.toLowerCase() === "guest";
                     return (
-                      <label key={m._id} className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-gym-gray/30">
-                        <input
-                          type="checkbox"
-                          className="accent-gym-yellow"
-                          checked={!!selected}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setNewMember({
-                                ...newMember,
-                                memberships: [...newMember.memberships, { membershipTypeId: m._id, discount: 0 }],
-                              })
-                            } else {
-                              setNewMember({
-                                ...newMember,
-                                memberships: newMember.memberships.filter((x) => x.membershipTypeId !== m._id),
-                              })
-                            }
-                          }}
-                        />
-                        <div className="flex-1">
-                          <p className="text-white text-sm font-semibold">{m.name}</p>
-                          <p className="text-gym-yellow text-xs">${m.price}</p>
-                        </div>
-                      </label>
-                    )
+                      <div key={m._id} className="mb-2 last:mb-0 border-b border-gym-gray-border/20 pb-2 last:border-0">
+                        <label className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-gym-gray/30">
+                          <input
+                            type="checkbox"
+                            className="accent-gym-yellow"
+                            checked={!!selected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewMember({
+                                  ...newMember,
+                                  memberships: [...newMember.memberships, { membershipTypeId: m._id, discount: 0 }],
+                                });
+                              } else {
+                                setNewMember({
+                                  ...newMember,
+                                  memberships: newMember.memberships.filter((x) => x.membershipTypeId !== m._id),
+                                });
+                              }
+                            }}
+                          />
+                          <div className="flex-1">
+                            <p className="text-white text-sm font-semibold">{m.name}</p>
+                            <p className="text-gym-yellow text-xs">${m.price}</p>
+                          </div>
+                        </label>
+
+                        {selected && (
+                          <div className="mt-1 ml-9 flex items-center gap-2">
+                              {isGuest && (
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-[10px] font-black uppercase text-gym-gray-text">Days</span>
+                                              <input
+                                                type="number"
+                                                min="1"
+                                                className="w-16 px-2 py-1 rounded bg-gym-black border border-gym-gray-border text-white text-xs focus:border-gym-yellow outline-none"
+                                                value={selected.quantity === undefined ? 1 : selected.quantity}
+                                                onChange={(e) => {
+                                                  const rawValue = e.target.value;
+                                                  const val = rawValue === "" ? "":Number(rawValue)
+                                                  setNewMember({
+                                                    ...newMember,
+                                                    memberships: newMember.memberships.map((x) =>
+                                                      x.membershipTypeId === m._id ? { ...x, quantity: val } : x
+                                                    ),
+                                                  });
+                                                }}
+                                              />
+                                            </div>
+                                          )}
+                                          
+                            <span className="text-[10px] font-black uppercase text-gym-gray-text">Discount $</span>
+                            <input
+                              type="number"
+                              placeholder="0"
+                              className="w-20 px-2 py-1 rounded bg-gym-black border border-gym-gray-border text-white text-xs focus:border-gym-yellow outline-none"
+                              value={selected.discount || ""}
+                              onChange={(e) => {
+                                const val = Number(e.target.value) || 0;
+                                setNewMember({
+                                  ...newMember,
+                                  memberships: newMember.memberships.map((x) =>
+                                    x.membershipTypeId === m._id ? { ...x, discount: val } : x
+                                  ),
+                                });
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
                   })}
                 </div>
               </div>

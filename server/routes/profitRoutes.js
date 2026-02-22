@@ -7,32 +7,39 @@ const Sale = require("../models/Sale");
 // Profit per PT Coach
 router.get("/by-coach", async (req, res) => {
   try {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
-    const result = await Payment.aggregate([
-      { 
-        $match: { 
-          category: "PT", 
-          coachName: { $exists: true, $ne: "" },
-          date: { $gte: startOfMonth } 
-        } 
-      },
+    const { start, end } = req.query;
+    const match = { category: "PT" }; 
 
+    if (start && end) {
+      const startDate = new Date(start);
+      startDate.setHours(0, 0, 0, 0);
+
+      const endDate = new Date(end);
+      endDate.setHours(23, 59, 59, 999);
+
+      match.date = { $gte: startDate, $lte: endDate };
+    } else {
+      const now = new Date();
+      match.date = { 
+        $gte: new Date(now.getFullYear(), now.getMonth(), 1),
+        $lte: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+      };
+    }
+
+    const result = await Payment.aggregate([
+      { $match: match },
       {
         $group: {
-          _id: "$coachName",
-          total: { $sum: "$amount" },
-          sessionsSold: { $sum: "$ptSessions" }
+          _id: "$coachName", 
+          total: { $sum: "$amount" }, 
+          sessionsSold: { $sum: { $ifNull: ["$ptSessions", 0] } }
         }
       },
-
       { $sort: { total: -1 } }
     ]);
 
     res.json(result);
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });

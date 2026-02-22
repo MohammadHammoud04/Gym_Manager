@@ -14,12 +14,15 @@
     "win": {
       "target": "nsis",
       "icon": "client/electron/favicon.ico",
-      "requestedExecutionLevel": "asInvoker"
+      "requestedExecutionLevel": "asInvoker" 
     },
     "nsis": {
       "installerIcon": "client/electron/favicon.ico",
       "oneClick": false,
-      "perMachine": true
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": true
     },
     "files": [
       "client/dist/**/*",

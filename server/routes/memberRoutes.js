@@ -9,7 +9,7 @@ const Log = require("../models/Log2");
 // create or extend member
 router.post("/", async (req, res) => {
   try {
-    let { name, phone, memberships = [], ptDetails, totalAmount = 0, paidAmount = 0 } = req.body;
+    let { name, phone, memberships = [], ptDetails, totalAmount = 0, paidAmount = 0,userName } = req.body;
 
     if (!name || !phone) return res.status(400).json({ error: "Name and phone are required" });
 
@@ -31,6 +31,7 @@ router.post("/", async (req, res) => {
     let remainingCash = Number(paidAmount);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    let totalDiscountApplied = 0;
     const createdPayments = [];
 
 //process payments
@@ -40,13 +41,16 @@ router.post("/", async (req, res) => {
 
 //guest logic
       const quantity = Math.max(1, Number(m.quantity || 1));
+      const discount = Number(m.discount || 0);
+      totalDiscountApplied += discount;
       const isGuest = newType.category?.toLowerCase() === "guest";
       const duration = isGuest ? quantity : (newType.durationInDays || 0);
 
 //cal cost and split payments
-      const costOfThis = (newType.price * quantity);
+      const fullPrice = newType.price * quantity;
+      const costOfThis = (newType.price * quantity) - discount;
       const payForThis = Math.min(remainingCash, costOfThis);
-      const debtForThis = costOfThis - payForThis;
+      const debtForThis = Math.max(0, costOfThis - payForThis);
 
       const existing = member.memberships.find(mem => 
         mem.membershipType && (
@@ -75,12 +79,13 @@ router.post("/", async (req, res) => {
       }
 
 //log payments for each class
-      if (payForThis > 0) {
+      if (payForThis > 0 || discount > 0) {
         createdPayments.push(await Payment.create({
           member: member._id,
           membershipType: newType._id,
           amount: payForThis,
-          originalAmount: costOfThis,
+          originalAmount: (newType.price * quantity),
+          discount: discount,
           category: "Membership",
           date: new Date()
         }));
@@ -125,10 +130,15 @@ router.post("/", async (req, res) => {
     
     await member.save();
 
+    let logDetails = `Added/Renewed member: ${member.name}`;
+    if (totalDiscountApplied > 0) {
+      logDetails += ` (Total Discount Given: $${totalDiscountApplied})`; // Append discount info
+    }
+
     await Log.create({
       actionType: 'ADDITION',
       module: 'MEMBER',
-      details: `Added/Renewed member: ${member.name}`,
+      details: logDetails,
       amount: Number(paidAmount),
       userName: req.body.userName
     });
