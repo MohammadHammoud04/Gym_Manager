@@ -29,8 +29,7 @@ export default function Dashboard() {
   const [todayExpenses, setTodayExpenses] = useState(0);
   const [startDate, setStartDate] = useState(getTodayStr());
   const [endDate, setEndDate] = useState(getTodayStr());
-  const [rangeProfit, setRangeProfit] = useState(0)
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [rangeData, setRangeData] = useState({ revenue: 0, expenses: 0, profit: 0 });  const [isSyncing, setIsSyncing] = useState(false);
   const [syncConfirm, setSyncConfirm] = useState(null); 
   const [pendingFile, setPendingFile] = useState(null);
   const [coachStartDate, setCoachStartDate] = useState(getFirstDayOfMonth());
@@ -137,9 +136,18 @@ export default function Dashboard() {
   }, []);
 
   const handleRangeSearch = async () => {
-    if (!startDate || !endDate) return
-    await fetchRangeProfit(startDate, endDate, setRangeProfit)
-  }
+    if (!startDate || !endDate) return;
+    try {
+      const res = await axios.get(`http://localhost:5000/profit/range?start=${startDate}&end=${endDate}`);
+      setRangeData({
+        revenue: res.data.revenue,
+        expenses: res.data.expenses,
+        profit: res.data.total
+      });
+    } catch (err) {
+      console.error("Range fetch error:", err);
+    }
+  };
 
   const handleExport = async () => {
       try {
@@ -344,25 +352,48 @@ export default function Dashboard() {
         </div>
       </div>
 
-        <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
-          <div className="flex items-center gap-2 mb-6">
-            <Search className="w-6 h-6 text-gym-yellow" />
-            <h2 className="text-2xl font-bold text-white">Range Calculator</h2>
+      <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
+        <div className="flex items-center gap-2 mb-6">
+          <Search className="w-6 h-6 text-gym-yellow" />
+          <h2 className="text-2xl font-bold text-white uppercase tracking-tight">Range Calculator</h2>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-gym-gray-text uppercase ml-1">From</label>
+            <input type="date" className="bg-gym-black border border-gym-gray-border text-white p-3 rounded-xl outline-none focus:border-gym-yellow text-sm" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <input type="date" className="bg-gym-gray border border-gym-gray-border text-white p-3 rounded-xl outline-none focus:border-gym-yellow" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-            <input type="date" className="bg-gym-gray border border-gym-gray-border text-white p-3 rounded-xl outline-none focus:border-gym-yellow" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-          </div>
-          <button onClick={handleRangeSearch} className="w-full bg-gym-yellow text-gym-black font-bold py-3 rounded-xl mb-6 hover:bg-gym-yellow-bright">Calculate Range Profit</button>
-          
-          <div className="p-6 rounded-xl bg-gym-black border-2 border-gym-yellow flex justify-between items-center">
-            <div>
-              <p className="text-gym-gray-text text-xs uppercase font-bold">Range Total</p>
-              <h3 className="text-3xl font-bold text-white">${rangeProfit}</h3>
-            </div>
-            <DollarSign className="w-10 h-10 text-gym-yellow" />
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-gym-gray-text uppercase ml-1">To</label>
+            <input type="date" className="bg-gym-black border border-gym-gray-border text-white p-3 rounded-xl outline-none focus:border-gym-yellow text-sm" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
         </div>
+
+        <button onClick={handleRangeSearch} className="w-full bg-gym-yellow text-gym-black font-black uppercase tracking-widest py-4 rounded-xl mb-6 hover:bg-gym-yellow-bright transition-all shadow-lg active:scale-95">
+          Calculate Range
+        </button>
+        
+        {/* Detailed Breakdown Box */}
+        <div className="p-5 rounded-2xl bg-gym-black border border-gym-gray-border space-y-4">
+          <div className="flex justify-between items-center border-b border-gym-gray-border/50 pb-3">
+            <span className="text-gym-gray-text font-bold text-xs uppercase">Total Revenue</span>
+            <span className="text-green-500 font-black text-xl">${rangeData.revenue}</span>
+          </div>
+          <div className="flex justify-between items-center border-b border-gym-gray-border/50 pb-3">
+            <span className="text-gym-gray-text font-bold text-xs uppercase">Total Expenses</span>
+            <span className="text-red-500 font-black text-xl">${rangeData.expenses}</span>
+          </div>
+          <div className="flex justify-between items-center pt-1">
+            <div>
+              <p className="text-gym-yellow text-[10px] uppercase font-black tracking-widest">Net Profit</p>
+              <h3 className="text-3xl font-black text-white">${rangeData.profit}</h3>
+            </div>
+            <div className="p-3 bg-gym-yellow/10 rounded-full">
+              <DollarSign className="w-8 h-8 text-gym-yellow" />
+            </div>
+          </div>
+        </div>
+      </div>
 
       </div>
 

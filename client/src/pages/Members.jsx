@@ -43,7 +43,11 @@ export default function Members() {
     membershipTypeId: null,
     coachName: null
   });
-  
+  const [adminPass, setAdminPass] = useState("");
+  const [showPassModal, setShowPassModal] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState(null);
+  const [deleteSuccessModal, setDeleteSuccessModal] = useState(null);
+
   const membershipTotal = newMember.memberships.reduce((sum, m) => {
     const type = membershipTypes.find(mt => mt._id === m.membershipTypeId);
     if (!type) return sum;
@@ -77,6 +81,46 @@ export default function Members() {
       console.error(err)
     }
   }
+
+  const handleDeleteAttempt = (member) => {
+    setMemberToDelete(member);
+    setShowPassModal(true);
+  };
+  
+  const confirmDeletion = async () => {
+    const ADMIN1_PASS = "admin123"; 
+    const ADMIN2_PASS = "nicole123";
+  
+    let performingUser = "";
+    if (adminPass === ADMIN1_PASS) performingUser = "admin";
+    if (adminPass === ADMIN2_PASS) performingUser = "admin2";
+  
+    if (performingUser !== "") {
+      try {
+        await axios.delete(`http://localhost:5000/members/${memberToDelete._id}`, {
+          data: { userName: performingUser }
+        });
+  
+        setMembers(members.filter(m => m._id !== memberToDelete._id));
+  
+        setAdminPass("");
+        setShowPassModal(false);
+        
+        setDeleteSuccessModal({
+        name: memberToDelete.name,
+        admin: performingUser
+      });
+        
+        setMemberToDelete(null);
+      } catch (err) {
+        console.error("Delete Error:", err);
+        alert("Failed to delete member. Check connection to server.");
+      }
+    } else {
+      alert("Incorrect Admin Password. Access Denied.");
+      setAdminPass("");
+    }
+  };
 
   const fetchMembers = async () => {
     try {
@@ -276,6 +320,15 @@ export default function Members() {
       return { ...m, memberships: frozenMems };
     }
 
+    if (memberFilter === "debt") {
+      // Check if member has a general balance OR if any individual membership has debt
+      const hasDebt = (m.balance > 0) || 
+                      (m.memberships?.some(mem => mem.balance > 0)) ||
+                      (m.personalTraining?.some(pt => pt.balance > 0));
+
+                      if (!hasDebt) return null
+    }
+
     if (sortCategory) {
       if (sortCategory === "PT") {
         const hasPT = m.personalTraining && m.personalTraining.some(pt => pt.sessionsLeft > 0);
@@ -345,6 +398,72 @@ export default function Members() {
             >
               OK
             </button>
+          </div>
+        </div>
+      )}
+
+      {deleteSuccessModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[110] p-4">
+          <div className="bg-gym-gray-dark border-2 border-green-500 rounded-2xl p-6 max-w-xs w-full shadow-2xl text-center">
+            <div className="mb-4 flex justify-center">
+              <div className="p-3 rounded-full bg-green-500/20 text-green-500">
+                <CheckCircle2 size={32} />
+              </div>
+            </div>
+            <h3 className="text-xl font-black text-white uppercase mb-2">Member Removed</h3>
+            <p className="text-gym-gray-text text-sm mb-6">
+              <span className="text-white font-bold">{deleteSuccessModal.name}</span> has been successfully deleted by <span className="text-gym-yellow uppercase text-xs">{deleteSuccessModal.admin}</span>.
+            </p>
+            <button 
+              onClick={() => setDeleteSuccessModal(null)}
+              className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-black uppercase tracking-widest transition-all"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* admin password modal */}
+      {showPassModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] animate-in fade-in zoom-in duration-200">
+          <div className="bg-gym-gray-dark border-2 border-red-500 rounded-2xl p-6 max-w-xs w-full mx-4 shadow-2xl text-center">
+            <div className="mb-4 flex justify-center">
+              <div className="p-3 rounded-full bg-red-500/20 text-red-500">
+                <AlertCircle size={32} />
+              </div>
+            </div>
+            
+            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">
+              Admin Required
+            </h3>
+            <p className="text-gym-gray-text text-sm mb-4">
+              Enter password to delete <span className="text-white font-bold">{memberToDelete?.name}</span>
+            </p>
+
+            <input 
+              type="password"
+              className="w-full bg-gym-black border border-gym-gray-border text-white p-3 rounded-xl outline-none focus:border-red-500 mb-4 text-center"
+              placeholder="••••••••"
+              value={adminPass}
+              onChange={(e) => setAdminPass(e.target.value)}
+              autoFocus
+            />
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={confirmDeletion}
+                className="w-full py-3 rounded-xl font-black uppercase tracking-widest transition-all bg-red-600 hover:bg-red-500 text-white"
+              >
+                Confirm Delete
+              </button>
+              <button
+                onClick={() => { setShowPassModal(false); setAdminPass(""); }}
+                className="w-full py-3 rounded-xl bg-gym-gray text-white font-bold hover:bg-gym-gray-border"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -809,7 +928,7 @@ export default function Members() {
 
             {/* filters */}
             <div className="mb-6 flex flex-wrap gap-4">
-              {["all", "pt", "inactive", "expiring", "frozen"].map((filter) => (
+              {["all", "pt", "inactive", "expiring", "frozen", "debt"].map((filter) => (
                 <button
                   key={filter}
                   onClick={() => setMemberFilter(filter)}
@@ -824,6 +943,7 @@ export default function Members() {
                   {filter === "inactive" && "Inactive"}
                   {filter === "expiring" && "Expiring"}
                   {filter === "frozen" && "Frozen"}
+                  {filter === "debt" && "Debt"}
                 </button>
               ))}
             </div>
@@ -858,7 +978,10 @@ export default function Members() {
                           <Users className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => setDeleteConfirm(member)}
+                          onClick={() => {
+                            setMemberToDelete(member);
+                            setShowPassModal(true);
+                          }}
                           className="w-8 h-8 rounded-full border border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center"
                         >
                           <Trash2 className="w-4 h-4" />
