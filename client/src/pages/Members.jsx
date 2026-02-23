@@ -321,12 +321,18 @@ export default function Members() {
     }
 
     if (memberFilter === "debt") {
-      // Check if member has a general balance OR if any individual membership has debt
       const hasDebt = (m.balance > 0) || 
                       (m.memberships?.some(mem => mem.balance > 0)) ||
                       (m.personalTraining?.some(pt => pt.balance > 0));
 
                       if (!hasDebt) return null
+    }
+
+    if (sortCategory !== "") {
+      const hasMatchingCategory = m.memberships?.some(
+        (ms) => ms.membershipType?.category === sortCategory
+      );
+      if (!hasMatchingCategory) return null;
     }
 
     if (sortCategory) {
@@ -915,7 +921,24 @@ export default function Members() {
           <div className="bg-gym-gray-dark border-2 border-gym-gray-border rounded-2xl p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-white">Members</h2>
-              <div className="relative w-64">
+              <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <ChevronDown className="w-4 h-4 text-gym-yellow" />
+                </div>
+                <select
+                  value={sortCategory}
+                  onChange={(e) => setSortCategory(e.target.value)}
+                  className="bg-gym-gray border border-gym-gray-border text-white text-xs font-black uppercase tracking-widest pl-10 pr-10 py-2 rounded-lg outline-none appearance-none focus:border-gym-yellow transition-all cursor-pointer min-w-[160px]"
+                >
+                  <option value="">All Categories</option>
+                  {[...new Set(membershipTypes.map((t) => t.category))].filter(Boolean).map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gym-gray-text" />
                 <input
                   className="w-full pl-10 pr-4 py-2 rounded-xl bg-gym-gray border border-gym-gray-border text-white text-sm focus:border-gym-yellow outline-none"
